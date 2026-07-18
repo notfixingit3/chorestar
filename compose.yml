@@ -1,0 +1,17 @@
+services:
+  chorestar:
+    build: .
+    container_name: chorestar
+    ports:
+      - "8282:80"
+    volumes:
+      # Mount the stack directory so changes are instantly reflected without rebuilding
+      - .:/usr/share/nginx/html
+    networks:
+      - groundzero
+    restart: unless-stopped
+
+networks:
+  groundzero:
+    external: true
+    name: groundzero_lan

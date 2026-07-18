@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Chore Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css?v=1.0.4">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar / Control Panel -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="time-widget">
+                    <div id="current-time">12:00 PM</div>
+                    <div id="current-date">Friday, July 17</div>
+                </div>
+            </div>
+            
+            <div class="family-stats-card">
+                <h3>Family Progress</h3>
+                <div class="progress-circle-container">
+                    <svg class="progress-ring" width="120" height="120">
+                        <circle class="progress-ring__circle-bg" stroke="rgba(255,255,255,0.05)" stroke-width="8" fill="transparent" r="50" cx="60" cy="60"/>
+                        <circle id="family-progress-ring" class="progress-ring__circle" stroke="url(#blue-gradient)" stroke-width="8" fill="transparent" r="50" cx="60" cy="60"/>
+                        <!-- Define Gradient for SVG -->
+                        <defs>
+                            <linearGradient id="blue-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#3b82f6" />
+                                <stop offset="100%" stop-color="#8b5cf6" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div class="progress-ring-text">
+                        <span id="family-percentage">0%</span>
+                        <span class="label">Completed</span>
+                    </div>
+                </div>
+                <div class="stats-row">
+                    <div class="stat-box">
+                        <span class="stat-val" id="family-done">0</span>
+                        <span class="stat-lbl">Done</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-val" id="family-total">0</span>
+                        <span class="stat-lbl">Total</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar Family Calendar -->
+            <div class="family-events-card" onclick="openCalendarSettings()">
+                <h3><i data-lucide="calendar"></i> Family Schedule</h3>
+                <div id="sidebar-events-list" class="sidebar-events-list">
+                    <!-- Loaded dynamically -->
+                </div>
+            </div>
+
+            <div class="sidebar-controls">
+                <button id="btn-settings" class="icon-btn">
+                    <i data-lucide="settings"></i>
+                    <span>Manage Chores</span>
+                </button>
+                <button id="btn-wake-lock" class="icon-btn">
+                    <i data-lucide="sun"></i>
+                    <span>Keep Screen On</span>
+                </button>
+            </div>
+            
+            <div class="brand-footer">
+                <span>ChoreStar Dashboard</span>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <div id="empty-state" class="empty-state hidden">
+                <div class="empty-icon-container">
+                    <i data-lucide="sparkles" class="empty-icon"></i>
+                </div>
+                <h2>Welcome to ChoreStar!</h2>
+                <p>Get started by adding family members and chores in the settings panel.</p>
+                <button id="btn-setup-first" class="primary-btn">
+                    <i data-lucide="plus-circle"></i> Add First Member & Chores
+                </button>
+            </div>
+
+            <!-- Grid for Kid Dashboard Cards -->
+            <div id="kids-grid" class="kids-grid">
+                <!-- Dynamically generated kid cards go here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2><i data-lucide="sliders"></i> Settings Panel</h2>
+                <button id="btn-close-modal" class="close-btn"><i data-lucide="x"></i></button>
+            </div>
+            
+            <div class="modal-tabs">
+                <button id="tab-kids" class="tab-btn active" onclick="switchTab('kids')">Family Members</button>
+                <button id="tab-chores" class="tab-btn" onclick="switchTab('chores')">Chores</button>
+                <button id="tab-calendar" class="tab-btn" onclick="switchTab('calendar')">Calendar</button>
+                <button id="tab-rewards" class="tab-btn" onclick="switchTab('rewards')">Rewards & Security</button>
+            </div>
+
+            <!-- Tab Content: Kids/Members -->
+            <div id="tab-content-kids" class="tab-content">
+                <div class="section-header">
+                    <h3>Manage Family Members</h3>
+                    <button onclick="showAddKidForm()" class="action-btn-sm"><i data-lucide="plus"></i> Add Member</button>
+                </div>
+                
+                <!-- Add Kid/Member Form (Hidden by default) -->
+                <form id="kid-form" class="settings-form hidden" onsubmit="saveKid(event)">
+                    <input type="hidden" id="edit-kid-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="kid-name">Member Name</label>
+                            <input type="text" id="kid-name" required placeholder="e.g. Kid 1">
+                        </div>
+                        <div class="form-group">
+                            <label for="kid-role">Role</label>
+                            <select id="kid-role" required>
+                                <option value="kid">Kid (Earns points & claims rewards)</option>
+                                <option value="parent">Parent (Tracks chores, no points/rewards)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="kid-color">Profile Theme Color</label>
+                            <div class="color-picker-grid">
+                                <label class="color-option" style="background-color: #ef4444;"><input type="radio" name="kid-color" value="#ef4444" checked></label>
+                                <label class="color-option" style="background-color: #f97316;"><input type="radio" name="kid-color" value="#f97316"></label>
+                                <label class="color-option" style="background-color: #eab308;"><input type="radio" name="kid-color" value="#eab308"></label>
+                                <label class="color-option" style="background-color: #22c55e;"><input type="radio" name="kid-color" value="#22c55e"></label>
+                                <label class="color-option" style="background-color: #06b6d4;"><input type="radio" name="kid-color" value="#06b6d4"></label>
+                                <label class="color-option" style="background-color: #3b82f6;"><input type="radio" name="kid-color" value="#3b82f6"></label>
+                                <label class="color-option" style="background-color: #6366f1;"><input type="radio" name="kid-color" value="#6366f1"></label>
+                                <label class="color-option" style="background-color: #a855f7;"><input type="radio" name="kid-color" value="#a855f7"></label>
+                                <label class="color-option" style="background-color: #ec4899;"><input type="radio" name="kid-color" value="#ec4899"></label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="kid-avatar">Profile Avatar Icon</label>
+                            <div class="emoji-picker-grid">
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="🦄" checked><span>🦄</span></label>
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="🎮"><span>🎮</span></label>
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="⚽"><span>⚽</span></label>
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="🐱"><span>🐱</span></label>
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="🐶"><span>🐶</span></label>
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="🦊"><span>🦊</span></label>
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="🦁"><span>🦁</span></label>
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="🦖"><span>🦖</span></label>
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="🚀"><span>🚀</span></label>
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="🎨"><span>🎨</span></label>
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="👩"><span>👩</span></label>
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="👨"><span>👨</span></label>
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="👑"><span>👑</span></label>
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="🍕"><span>🍕</span></label>
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="🍩"><span>🍩</span></label>
+                                <label class="emoji-option"><input type="radio" name="kid-avatar" value="🌟"><span>🌟</span></label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="submit-btn">Save Member</button>
+                        <button type="button" class="cancel-btn" onclick="hideKidForm()">Cancel</button>
+                    </div>
+                </form>
+
+                <div id="kids-list-container" class="settings-list">
+                    <!-- Loaded dynamically -->
+                </div>
+            </div>
+
+            <!-- Tab Content: Chores -->
+            <div id="tab-content-chores" class="tab-content hidden">
+                <div class="section-header">
+                    <h3>Manage Chores</h3>
+                    <button onclick="showAddChoreForm()" class="action-btn-sm"><i data-lucide="plus"></i> Add Chore</button>
+                </div>
+
+                <!-- Add Chore Form (Hidden by default) -->
+                <form id="chore-form" class="settings-form hidden" onsubmit="saveChore(event)">
+                    <input type="hidden" id="edit-chore-id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="chore-title">Chore Title</label>
+                            <input type="text" id="chore-title" required placeholder="e.g. Make your bed">
+                        </div>
+                        <div class="form-group">
+                            <label for="chore-points">Points Awarded</label>
+                            <input type="number" id="chore-points" min="1" max="100" value="10" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="chore-kid">Assign To</label>
+                            <select id="chore-kid" required>
+                                <option value="all">Everyone (Creates chore for each member)</option>
+                                <!-- Populated dynamically -->
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="chore-frequency">Frequency</label>
+                            <select id="chore-frequency" onchange="handleChoreFrequencyChange()">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="days">Specific Days</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Days of Week check grid (Visible only when 'days' is selected) -->
+                    <div id="chore-days-container" class="form-row hidden" style="margin-top: 0.5rem;">
+                        <div class="form-group">
+                            <label>Repeat on Days</label>
+                            <div class="days-checkbox-grid">
+                                <label class="day-checkbox-item"><input type="checkbox" name="chore-days" value="Mon"> <span>Mon</span></label>
+                                <label class="day-checkbox-item"><input type="checkbox" name="chore-days" value="Tue"> <span>Tue</span></label>
+                                <label class="day-checkbox-item"><input type="checkbox" name="chore-days" value="Wed"> <span>Wed</span></label>
+                                <label class="day-checkbox-item"><input type="checkbox" name="chore-days" value="Thu"> <span>Thu</span></label>
+                                <label class="day-checkbox-item"><input type="checkbox" name="chore-days" value="Fri"> <span>Fri</span></label>
+                                <label class="day-checkbox-item"><input type="checkbox" name="chore-days" value="Sat"> <span>Sat</span></label>
+                                <label class="day-checkbox-item"><input type="checkbox" name="chore-days" value="Sun"> <span>Sun</span></label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="submit-btn">Save Chore</button>
+                        <button type="button" class="cancel-btn" onclick="hideChoreForm()">Cancel</button>
+                    </div>
+                </form>
+
+                <div id="chores-list-container" class="settings-list">
+                    <!-- Loaded dynamically -->
+                </div>
+            </div>
+
+            <!-- Tab Content: Calendar -->
+            <div id="tab-content-calendar" class="tab-content hidden">
+                <div class="section-header">
+                    <h3>Family Calendar & Agenda</h3>
+                </div>
+                
+                <form id="event-form" class="settings-form" onsubmit="saveEvent(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="event-title">Event Title</label>
+                            <input type="text" id="event-title" required placeholder="e.g. Kid 1: Soccer Practice">
+                        </div>
+                        <div class="form-group">
+                            <label for="event-date">Date</label>
+                            <input type="date" id="event-date" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="event-time">Time (Optional)</label>
+                            <input type="text" id="event-time" placeholder="e.g. 5:00 PM - 6:30 PM">
+                        </div>
+                        <div class="form-group">
+                            <label for="event-color">Category Tag</label>
+                            <select id="event-color">
+                                <option value="#3b82f6" selected>Blue (General)</option>
+                                <option value="#10b981">Green (Health / School)</option>
+                                <option value="#f59e0b">Amber (Important / Alert)</option>
+                                <option value="#ec4899">Pink (Kids / Fun)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="submit-btn"><i data-lucide="plus-circle"></i> Add Event</button>
+                    </div>
+                </form>
+
+                <div id="events-list-container" class="settings-list">
+                    <!-- Loaded dynamically -->
+                </div>
+            </div>
+
+            <!-- Tab Content: Rewards & Security -->
+            <div id="tab-content-rewards" class="tab-content hidden">
+                <div class="section-header">
+                    <h3>Rewards & Security</h3>
+                </div>
+                <div class="settings-card-body">
+                    <div class="admin-option-group">
+                        <h4>Point Reset Schedule</h4>
+                        <p class="description">Chores marked "Daily" reset automatically every morning. You can manually reset points here, or set reward goals.</p>
+                        <div class="button-group-row">
+                            <button class="danger-btn" onclick="resetAllPointsConfirm()"><i data-lucide="rotate-ccw"></i> Reset All Points to 0</button>
+                            <button class="warning-btn" onclick="resetAllChoresConfirm()"><i data-lucide="refresh-cw"></i> Reset Today's Chores</button>
+                        </div>
+                    </div>
+                    
+                    <div class="admin-option-group" style="margin-top: 2rem;">
+                        <h4>Reward Goals</h4>
+                        <p class="description">Add special achievements kids can claim once they earn enough points.</p>
+                        
+                        <form id="reward-form" class="settings-form-inline" onsubmit="saveReward(event)">
+                            <input type="text" id="reward-title" placeholder="Reward description (e.g. 1 hour of screen time)" required>
+                            <input type="number" id="reward-cost" placeholder="Points cost (e.g. 50)" required min="5">
+                            <button type="submit" class="primary-btn-sm"><i data-lucide="plus"></i> Add Goal</button>
+                        </form>
+                        
+                        <div id="rewards-list-container" class="settings-list" style="margin-top: 1rem;">
+                            <!-- Dynamically loaded rewards -->
+                        </div>
+                    </div>
+
+                    <div class="admin-option-group" style="margin-top: 2rem;">
+                        <h4>Parent Security PIN</h4>
+                        <p class="description">Prevent children from bypassing chores, adding points, or deleting profiles by locking the Settings Panel.</p>
+                        
+                        <div class="settings-form-inline" style="margin-top: 1rem; border: none; padding: 0; display: flex; gap: 1rem; align-items: flex-end;">
+                            <div class="form-group" style="flex: 1;">
+                                <label for="parent-pin-input">Set 4-Digit Security PIN (numbers only)</label>
+                                <input type="password" id="parent-pin-input" placeholder="e.g. 1234" maxlength="4" style="letter-spacing: 0.5rem; text-align: center; font-size: 1.25rem;">
+                            </div>
+                            <button id="btn-save-pin" class="primary-btn" onclick="saveParentPin()" style="height: 46px; margin-top: auto;"><i data-lucide="shield-check"></i> Save PIN</button>
+                            <button id="btn-disable-pin" class="danger-btn hidden" onclick="disableParentPin()" style="height: 46px; margin-top: auto;"><i data-lucide="shield-off"></i> Disable PIN</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PIN Pad Modal -->
+    <div id="pin-modal" class="modal-overlay hidden">
+        <div class="pin-card">
+            <div class="pin-header">
+                <i data-lucide="lock" class="pin-lock-icon"></i>
+                <h3>Enter Parent PIN</h3>
+                <p>Security lock is active</p>
+            </div>
+            
+            <div class="pin-display">
+                <div class="pin-dot"></div>
+                <div class="pin-dot"></div>
+                <div class="pin-dot"></div>
+                <div class="pin-dot"></div>
+            </div>
+            
+            <div class="pin-keypad">
+                <button class="pin-key" onclick="pressPinKey('1')">1</button>
+                <button class="pin-key" onclick="pressPinKey('2')">2</button>
+                <button class="pin-key" onclick="pressPinKey('3')">3</button>
+                <button class="pin-key" onclick="pressPinKey('4')">4</button>
+                <button class="pin-key" onclick="pressPinKey('5')">5</button>
+                <button class="pin-key" onclick="pressPinKey('6')">6</button>
+                <button class="pin-key" onclick="pressPinKey('7')">7</button>
+                <button class="pin-key" onclick="pressPinKey('8')">8</button>
+                <button class="pin-key" onclick="pressPinKey('9')">9</button>
+                <button class="pin-key clear" onclick="clearPin()">C</button>
+                <button class="pin-key" onclick="pressPinKey('0')">0</button>
+                <button class="pin-key backspace" onclick="backspacePin()"><i data-lucide="delete"></i></button>
+            </div>
+            
+            <div style="margin-top: 1.5rem;">
+                <button class="cancel-btn" onclick="closePinModal()" style="width: 100%;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dialog Confirmation modal (custom alert for beautiful UI) -->
+    <div id="dialog-confirm" class="dialog-overlay hidden">
+        <div class="dialog-card">
+            <h3 id="dialog-title">Are you sure?</h3>
+            <p id="dialog-message">This action cannot be undone.</p>
+            <div class="dialog-actions">
+                <button id="dialog-btn-yes" class="danger-btn">Yes, proceed</button>
+                <button id="dialog-btn-no" class="cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Script -->
+    <script src="app.js?v=1.0.4"></script>
+</body>
+</html>
