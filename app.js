@@ -527,7 +527,7 @@ function updateFamilyProgressCircle(completed, total) {
 }
 
 // --- Interaction Logics ---
-function toggleChore(activeChoreId) {
+window.toggleChore = function(activeChoreId) {
     const choreIndex = state.activeChoreInstancesIndex = state.activeChores.findIndex(c => c.id === activeChoreId);
     if (choreIndex === -1) return;
     
@@ -591,7 +591,7 @@ function celebrateKidCompletion() {
     }());
 }
 
-async function claimReward(kidId, rewardId) {
+window.claimReward = async function(kidId, rewardId) {
     const kid = state.kids.find(k => k.id === kidId);
     const reward = state.rewards.find(r => r.id === rewardId);
     
