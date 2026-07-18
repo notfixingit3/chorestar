@@ -1,7 +1,7 @@
 {
   "name": "chorestar",
-  "version": "0.0.1-beta.5",
-  "description": "Multi-device synchronized family chores list",
+  "version": "0.0.1-beta.6",
+  "description": "Self-hosted household chore board for shared displays and phones",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

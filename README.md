@@ -14,7 +14,7 @@
 
 ![ChoreStar running at 1920 by 1080 on an Echo Show layout](docs/images/chorestar-echo-show.png)
 
-ChoreStar turns a shared screen into an actual household operating surface. Everyone can see what is due, check off their own work, follow the family schedule, and understand the day's progress without opening a phone or navigating a generic productivity app.
+ChoreStar turns a shared screen into an actual household operating surface. Everyone can see what is due, check off their work, follow what is coming up, and understand the day's progress without opening another app or navigating a generic productivity dashboard.
 
 It is intentionally self-hosted, touch-friendly, dependency-light, and usable on a private network without relying on public font, icon, or animation CDNs.
 
@@ -23,10 +23,13 @@ It is intentionally self-hosted, touch-friendly, dependency-light, and usable on
 | Household workflow | ChoreStar behavior |
 | --- | --- |
 | **Daily lineup** | Gives each family member a clear lane with large touch targets and visible progress. |
-| **Recurring routines** | Supports daily, weekly, and selected-day chore schedules with automatic resets. |
-| **Points and rewards** | Awards points when kids finish chores and lets them claim household-defined rewards. |
-| **Family schedule** | Keeps the next events visible beside the chore board instead of hiding them in another app. |
-| **Parent management** | Manages members, roles, chores, schedules, rewards, points, and reset actions in one workspace. |
+| **Routines and one-offs** | Supports daily, weekly, selected-day, and dated one-time chores with safe carryover. |
+| **Parent approvals** | Can hold selected chores and rewards for review before points are added or spent. |
+| **Points and rewards** | Awards points for completed work and lets kids request household-defined rewards. |
+| **Up next** | Combines approval requests, notes, one-off chores, routine pauses, and optional schedule entries. |
+| **Household continuity** | Posts time-limited notes and pauses routines for a member or the whole household. |
+| **Activity history** | Records completed and reopened chores plus claimed rewards in a parent-facing timeline. |
+| **Parent management** | Manages members, chores, household context, approvals, rewards, points, and reset actions. |
 | **Shared-device safety** | Protects management actions with a server-verified PIN and an HttpOnly parent session. |
 | **Multi-device sync** | Uses server-authoritative mutations and revisions so one device cannot silently overwrite another. |
 | **Resilient display** | Bundles its font, icons, and celebration assets and includes a screen wake-lock control. |
@@ -35,7 +38,7 @@ It is intentionally self-hosted, touch-friendly, dependency-light, and usable on
 
 The Echo Show layout keeps four family members visible at once on a 1920x1080 display. The interface uses solid surfaces, high-legibility type, restrained member colors, and predictable touch targets instead of glass panels or an assistant-style chat shell.
 
-On a phone, ChoreStar switches to one member at a time with direct navigation between the daily lineup, schedule, and management tools.
+On a phone, ChoreStar switches to one member at a time with direct navigation between the daily lineup, the Up next feed, and management tools.
 
 <p align="center">
   <img src="docs/images/chorestar-mobile.png" width="390" alt="ChoreStar mobile member view">
@@ -57,6 +60,8 @@ flowchart LR
 - Chore completion and reward claims are validated and applied atomically by the server.
 - Administrative saves carry a revision number; stale writes receive the latest state instead of overwriting it.
 - Daily and selected-day chores refresh each morning. Weekly chores carry through until Monday.
+- One-off chores remain visible until completed, while routine pauses suppress only recurring work.
+- Selected completions and reward claims can wait for a parent decision without changing points early.
 - State is persisted with a temporary-file-and-rename operation to avoid partial JSON writes.
 
 ## Run With Docker
@@ -71,7 +76,7 @@ docker run -d \
   --restart unless-stopped \
   -p 8282:80 \
   -v "$PWD/data:/app/data" \
-  ghcr.io/notfixingit3/chorestar:0.0.1-beta.5
+  ghcr.io/notfixingit3/chorestar:0.0.1-beta.6
 ```
 
 Open `http://<docker-host>:8282` and confirm the container is healthy:
@@ -91,7 +96,7 @@ ssh house@docker1
 cd /opt/stacks/chorestar
 
 mkdir -p data
-printf 'CHORESTAR_TAG=0.0.1-beta.5\n' > .env
+printf 'CHORESTAR_TAG=0.0.1-beta.6\n' > .env
 
 docker compose pull
 docker compose up -d
@@ -134,7 +139,8 @@ docker build -t chorestar:local .
 ## Data And Security
 
 - Runtime data lives in `data/state.json`; mount `/app/data` to persistent storage.
-- Existing state files are migrated when read; upgrading does not replace household members or reset their data.
+- Existing state files are migrated when read; upgrading retains members, points, chores, completions, rewards, and schedule entries.
+- Approvals, history, pauses, and notes are added as empty collections when upgrading an older state file.
 - Legacy plaintext PINs are converted to a salted scrypt hash on the next write.
 - The parent PIN is never returned as part of browser state.
 - Only the application shell and explicitly allowed bundled assets are publicly served.
@@ -146,14 +152,14 @@ ChoreStar is designed for a trusted household network. Put it behind HTTPS and a
 
 Pushes to `dev` run the test suite and publish a development container. Tags matching `v*` publish semver container tags through [GitHub Actions](.github/workflows/docker-publish.yml).
 
-For example, tag `v0.0.1-beta.5` publishes:
+For example, tag `v0.0.1-beta.6` publishes:
 
 ```text
-ghcr.io/notfixingit3/chorestar:0.0.1-beta.5
+ghcr.io/notfixingit3/chorestar:0.0.1-beta.6
 ```
 
 The application version is read from `package.json` and exposed by both `/healthz` and `/api/state`.
 
 ## Project Status
 
-ChoreStar is currently in beta. The core household board, schedules, recurring chores, rewards, synchronization, Docker delivery, and parent controls are functional. The next useful product layers are completion history, optional parent approval for selected chores and rewards, schedule exceptions, and calendar import.
+ChoreStar is currently in beta. The household board, recurring and one-off chores, approvals, completion history, routine pauses, notes, rewards, synchronization, Docker delivery, and parent controls are functional. Future work will focus on feedback from real shared-display use, accessibility, and carefully scoped integrations that reduce household coordination work.

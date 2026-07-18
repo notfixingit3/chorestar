@@ -2,7 +2,7 @@
    FAMILY CHORE DASHBOARD - LOGIC
    ========================================== */
 
-const APP_VERSION = '0.0.1-beta.5';
+const APP_VERSION = '0.0.1-beta.6';
 
 // --- Constants & State ---
 const STORAGE_KEYS = {
@@ -11,7 +11,11 @@ const STORAGE_KEYS = {
     ACTIVE_CHORES: 'chorestar_active_chores',
     REWARDS: 'chorestar_rewards',
     LAST_RESET: 'chorestar_last_reset',
-    EVENTS: 'chorestar_events'
+    EVENTS: 'chorestar_events',
+    APPROVALS: 'chorestar_approvals',
+    HISTORY: 'chorestar_history',
+    EXCEPTIONS: 'chorestar_exceptions',
+    NOTES: 'chorestar_notes'
 };
 
 let state = {
@@ -20,6 +24,10 @@ let state = {
     activeChores: [],
     rewards: [],
     events: [],
+    approvals: [],
+    history: [],
+    exceptions: [],
+    notes: [],
     lastResetDate: ''
 };
 
@@ -44,24 +52,28 @@ const DEMO_DATA = {
         { id: 'parent-two', name: 'Parent 2', color: '#3fa675', points: 0, role: 'parent', avatar: 'P2' }
     ],
     chores: [
-        { id: 'chore-1', title: 'Make your bed', points: 5, frequency: 'daily', kidId: 'all' },
-        { id: 'chore-2', title: 'Brush teeth & wash face', points: 5, frequency: 'daily', kidId: 'all' },
-        { id: 'chore-3', title: 'Empty dishwasher', points: 10, frequency: 'daily', kidId: 'all' },
-        { id: 'chore-4', title: 'Put out trash bins', points: 15, frequency: 'days', daysOfWeek: ['Tue', 'Fri'], kidId: 'all' },
-        { id: 'chore-5', title: 'Clean bedroom', points: 25, frequency: 'weekly', kidId: 'all' }
+        { id: 'chore-1', title: 'Make your bed', points: 5, frequency: 'daily', kidId: 'all', dueDate: '', requiresApproval: false, completedAt: '' },
+        { id: 'chore-2', title: 'Brush teeth & wash face', points: 5, frequency: 'daily', kidId: 'all', dueDate: '', requiresApproval: false, completedAt: '' },
+        { id: 'chore-3', title: 'Empty dishwasher', points: 10, frequency: 'daily', kidId: 'all', dueDate: '', requiresApproval: false, completedAt: '' },
+        { id: 'chore-4', title: 'Put out trash bins', points: 15, frequency: 'days', daysOfWeek: ['Tue', 'Fri'], kidId: 'all', dueDate: '', requiresApproval: false, completedAt: '' },
+        { id: 'chore-5', title: 'Clean bedroom', points: 25, frequency: 'weekly', kidId: 'all', dueDate: '', requiresApproval: false, completedAt: '' }
     ],
     activeChores: [],
     rewards: [
-        { id: 'reward-1', title: '30 min Screen Time', cost: 30 },
-        { id: 'reward-2', title: 'Ice Cream Sundae', cost: 50 },
-        { id: 'reward-3', title: 'Stay up 30 min late', cost: 60 },
-        { id: 'reward-4', title: 'New Toy under $10', cost: 100 }
+        { id: 'reward-1', title: '30 min Screen Time', cost: 30, requiresApproval: false },
+        { id: 'reward-2', title: 'Ice Cream Sundae', cost: 50, requiresApproval: false },
+        { id: 'reward-3', title: 'Stay up 30 min late', cost: 60, requiresApproval: false },
+        { id: 'reward-4', title: 'New Toy under $10', cost: 100, requiresApproval: false }
     ],
     events: [
         { id: 'event-1', title: 'Soccer practice', date: getRelativeDateString(0), time: '5:00 PM', color: '#ec4899' },
         { id: 'event-2', title: 'Dentist appointment', date: getRelativeDateString(1), time: '10:00 AM', color: '#3b82f6' },
         { id: 'event-3', title: 'Family Movie Night 🍿', date: getRelativeDateString(2), time: '7:00 PM', color: '#10b981' }
     ],
+    approvals: [],
+    history: [],
+    exceptions: [],
+    notes: [],
     lastResetDate: ''
 };
 
@@ -75,7 +87,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initEventListeners();
     initWakeLock();
     if (window.lucide) lucide.createIcons();
-    document.getElementById('app-version').innerText = `Beta 5 · ${APP_VERSION}`;
+    document.getElementById('app-version').innerText = `Beta 6 · ${APP_VERSION}`;
     
     await syncWithServer();
     startServerSyncPolling();
@@ -92,6 +104,10 @@ function loadLocalCache() {
         const storedRewards = localStorage.getItem(STORAGE_KEYS.REWARDS);
         const storedReset = localStorage.getItem(STORAGE_KEYS.LAST_RESET);
         const storedEvents = localStorage.getItem(STORAGE_KEYS.EVENTS);
+        const storedApprovals = localStorage.getItem(STORAGE_KEYS.APPROVALS);
+        const storedHistory = localStorage.getItem(STORAGE_KEYS.HISTORY);
+        const storedExceptions = localStorage.getItem(STORAGE_KEYS.EXCEPTIONS);
+        const storedNotes = localStorage.getItem(STORAGE_KEYS.NOTES);
 
         if (storedKids && storedChores) {
             state.kids = JSON.parse(storedKids);
@@ -110,6 +126,10 @@ function loadLocalCache() {
                 state.events = parsedEvents;
             }
             state.lastResetDate = storedReset || '';
+            state.approvals = storedApprovals ? JSON.parse(storedApprovals) : [];
+            state.history = storedHistory ? JSON.parse(storedHistory) : [];
+            state.exceptions = storedExceptions ? JSON.parse(storedExceptions) : [];
+            state.notes = storedNotes ? JSON.parse(storedNotes) : [];
             lastStateString = JSON.stringify(state);
         } else {
             state = JSON.parse(JSON.stringify(DEMO_DATA));
@@ -119,7 +139,7 @@ function loadLocalCache() {
         }
     } catch (e) {
         console.error("Error reading localStorage, using blank state", e);
-        state = { kids: [], chores: [], activeChores: [], rewards: [], events: [], lastResetDate: getTodayString() };
+        state = { kids: [], chores: [], activeChores: [], rewards: [], events: [], approvals: [], history: [], exceptions: [], notes: [], lastResetDate: getTodayString() };
     }
 }
 
@@ -129,6 +149,10 @@ function saveLocalCache() {
     localStorage.setItem(STORAGE_KEYS.ACTIVE_CHORES, JSON.stringify(state.activeChores));
     localStorage.setItem(STORAGE_KEYS.REWARDS, JSON.stringify(state.rewards));
     localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(state.events));
+    localStorage.setItem(STORAGE_KEYS.APPROVALS, JSON.stringify(state.approvals || []));
+    localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(state.history || []));
+    localStorage.setItem(STORAGE_KEYS.EXCEPTIONS, JSON.stringify(state.exceptions || []));
+    localStorage.setItem(STORAGE_KEYS.NOTES, JSON.stringify(state.notes || []));
     localStorage.setItem(STORAGE_KEYS.LAST_RESET, state.lastResetDate);
 }
 
@@ -137,7 +161,7 @@ function applyServerEnvelope(envelope, rerender = true) {
     state = envelope.state;
     stateRevision = Number(envelope.revision) || 0;
     pinEnabled = Boolean(envelope.pinEnabled);
-    if (envelope.version) document.getElementById('app-version').innerText = `Beta 5 · ${envelope.version}`;
+    if (envelope.version) document.getElementById('app-version').innerText = `Beta 6 · ${envelope.version}`;
     lastStateString = JSON.stringify(state);
     saveLocalCache();
     setSyncStatus(true);
@@ -264,6 +288,12 @@ function initClock() {
 }
 
 // --- Daily Chore Reset Check ---
+function isRoutinePaused(memberId, date) {
+    return (state.exceptions || []).some(exception =>
+        (exception.kidId === 'all' || exception.kidId === memberId) &&
+        exception.startDate <= date && exception.endDate >= date);
+}
+
 function checkDailyReset() {
     const today = getTodayString();
     if (state.lastResetDate !== today) {
@@ -283,9 +313,10 @@ function resetDailyChoresForNewDay(todayDate) {
     const isMonday = d.getDay() === 1; // 1 is Monday
     
     // Filter out yesterday's daily and specific-days chores, keep weekly chores depending on if it's Monday
-    const weeklyToKeep = isMonday 
-        ? [] 
-        : state.activeChores.filter(c => c.frequency === 'weekly');
+    const weeklyToKeep = state.activeChores.filter(chore =>
+        chore.pendingApproval ||
+        (chore.frequency === 'once' && !chore.completed) ||
+        (chore.frequency === 'weekly' && !isMonday));
         
     state.activeChores = [...weeklyToKeep];
     state.lastResetDate = todayDate;
@@ -312,14 +343,18 @@ function initializeActiveChores(dateStr) {
             shouldAdd = true;
         } else if (chore.frequency === 'days') {
             shouldAdd = chore.daysOfWeek && chore.daysOfWeek.includes(dayOfWeekStr);
+        } else if (chore.frequency === 'once') {
+            shouldAdd = Boolean(chore.dueDate && chore.dueDate <= today && !chore.completedAt);
         }
         
         if (!shouldAdd) return;
         
         const addChoreForKid = (kidId) => {
+            if (chore.frequency !== 'once' && isRoutinePaused(kidId, today)) return;
             // Check if chore instance already exists for today
             const exists = state.activeChores.some(ac => 
-                ac.choreId === chore.id && ac.kidId === kidId && ac.dateAssigned === today
+                ac.choreId === chore.id && ac.kidId === kidId &&
+                (ac.pendingApproval || ac.frequency === 'weekly' || ac.frequency === 'once' || ac.dateAssigned === today)
             );
             
             if (!exists) {
@@ -332,7 +367,10 @@ function initializeActiveChores(dateStr) {
                     frequency: chore.frequency,
                     daysOfWeek: chore.daysOfWeek || [],
                     completed: false,
-                    dateAssigned: today
+                    pendingApproval: false,
+                    requiresApproval: Boolean(chore.requiresApproval),
+                    completedAt: '',
+                    dateAssigned: chore.frequency === 'once' ? chore.dueDate : today
                 });
             }
         };
@@ -356,13 +394,19 @@ function rebuildActiveChoresForToday() {
     initializeActiveChores(getTodayString());
     state.activeChores.forEach(active => {
         const oldActive = previous.get(`${active.kidId}:${active.choreId}`);
-        if (!oldActive?.completed) return;
-        active.completed = true;
+        if (!oldActive) return;
+        active.completed = Boolean(oldActive.completed);
+        active.pendingApproval = Boolean(oldActive.pendingApproval);
+        active.completedAt = oldActive.completedAt || '';
+        const approval = (state.approvals || []).find(item => item.activeChoreId === oldActive.id);
+        if (approval) approval.activeChoreId = active.id;
         const member = state.kids.find(kid => kid.id === active.kidId);
-        if (member && member.role !== 'parent' && active.points !== oldActive.points) {
+        if (active.completed && member && member.role !== 'parent' && active.points !== oldActive.points) {
             member.points = Math.max(0, member.points + active.points - oldActive.points);
         }
     });
+    const activeIds = new Set(state.activeChores.map(active => active.id));
+    state.approvals = (state.approvals || []).filter(approval => approval.type !== 'chore' || activeIds.has(approval.activeChoreId));
 }
 
 // --- Custom Dialog Modal Helper ---
@@ -494,23 +538,26 @@ function renderDashboard() {
                     frequencyText = (chore.daysOfWeek && chore.daysOfWeek.length > 0) 
                         ? chore.daysOfWeek.join(', ') 
                         : 'Scheduled';
+                } else if (chore.frequency === 'once') {
+                    frequencyText = chore.dateAssigned === getTodayString() ? 'One time' : `Due ${friendlyDateLabel(chore.dateAssigned)}`;
                 }
                 
                 // Points indicators (Kids only)
                 const pointsIndicatorHTML = role !== 'parent'
-                    ? `<div class="chore-right"><span class="chore-points">+${chore.points}</span></div>`
+                    ? `<div class="chore-right"><span class="chore-points">${chore.pendingApproval ? 'Review' : `+${chore.points}`}</span></div>`
                     : '';
                     
                 cardHTML += `
-                    <button type="button" class="chore-item ${chore.completed ? 'completed' : ''}" data-chore-id="${escapeHTML(chore.id)}" aria-pressed="${chore.completed}">
+                    <button type="button" class="chore-item ${chore.completed ? 'completed' : ''} ${chore.pendingApproval ? 'pending' : ''}" data-chore-id="${escapeHTML(chore.id)}" aria-pressed="${chore.completed}">
                         <div class="chore-left">
                             <div class="chore-checkbox">
-                                <i data-lucide="check"></i>
+                                <i data-lucide="${chore.pendingApproval ? 'clock-3' : 'check'}"></i>
                             </div>
                             <div>
                                 <div class="chore-title">${escapeHTML(chore.title)}</div>
                                 <div class="chore-badge-row">
                                     <span class="chore-frequency-badge">${escapeHTML(frequencyText)}</span>
+                                    ${chore.pendingApproval ? '<span class="chore-frequency-badge approval-badge">Awaiting approval</span>' : ''}
                                 </div>
                             </div>
                         </div>
@@ -529,14 +576,16 @@ function renderDashboard() {
             `;
             
             state.rewards.forEach(reward => {
-                const canAfford = kid.points >= reward.cost;
+                const isPending = (state.approvals || []).some(approval => approval.type === 'reward' && approval.memberId === kid.id && approval.rewardId === reward.id);
+                const canAfford = kid.points >= reward.cost && !isPending;
+                const claimLabel = isPending ? 'Pending' : canAfford ? (reward.requiresApproval ? 'Request' : 'Claim') : 'Locked';
                 cardHTML += `
                     <button type="button" class="reward-claim-card ${!canAfford ? 'disabled' : ''}"
                          data-kid-id="${escapeHTML(kid.id)}" data-reward-id="${escapeHTML(reward.id)}" ${canAfford ? '' : 'disabled'}>
                         <div class="reward-claim-title">${escapeHTML(reward.title)}</div>
                         <div class="reward-claim-footer">
                             <span class="reward-cost-tag">${reward.cost} pts</span>
-                            <span class="claim-indicator">${canAfford ? 'Claim' : 'Locked'}</span>
+                            <span class="claim-indicator">${claimLabel}</span>
                         </div>
                     </button>
                 `;
@@ -617,6 +666,9 @@ window.toggleChore = async function(activeChoreId) {
         if (!response.ok) throw new Error(envelope.error || 'Chore could not be updated');
         applyServerEnvelope(envelope);
         const updated = state.activeChores.find(chore => chore.id === activeChoreId);
+        if (updated?.pendingApproval && !previous.pendingApproval) {
+            showToast(`${updated.title} is ready for parent review.`);
+        }
         if (updated?.completed && !previous.completed) {
             celebrate({ particleCount: 28, spread: 46, origin: { y: 0.72 } });
             const memberChores = state.activeChores.filter(chore => chore.kidId === updated.kidId);
@@ -669,8 +721,11 @@ window.claimReward = async function(kidId, rewardId) {
     
     if (!kid || !reward || kid.points < reward.cost) return;
     
-    const confirmText = `Deduct ${reward.cost} points from ${kid.name} for "${reward.title}"?`;
-    const confirmed = await showConfirm("Claim Reward?", confirmText);
+    const confirmTitle = reward.requiresApproval ? 'Request Reward?' : 'Claim Reward?';
+    const confirmText = reward.requiresApproval
+        ? `Request "${reward.title}" for ${kid.name}? ${reward.cost} points will be spent after parent approval.`
+        : `Deduct ${reward.cost} points from ${kid.name} for "${reward.title}"?`;
+    const confirmed = await showConfirm(confirmTitle, confirmText);
     
     if (confirmed) {
         try {
@@ -682,13 +737,17 @@ window.claimReward = async function(kidId, rewardId) {
             const envelope = await response.json();
             if (!response.ok) throw new Error(envelope.error || 'Reward could not be claimed');
             applyServerEnvelope(envelope);
-            celebrate({
-                particleCount: 64,
-                spread: 76,
-                colors: ['#f0bd3d', '#e84d63', '#4f7cff', '#3fa675'],
-                origin: { y: 0.62 }
-            });
-            showToast(`${kid.name} claimed ${reward.title}.`);
+            if (envelope.pendingApproval) {
+                showToast(`${reward.title} is ready for parent review.`);
+            } else {
+                celebrate({
+                    particleCount: 64,
+                    spread: 76,
+                    colors: ['#f0bd3d', '#e84d63', '#4f7cff', '#3fa675'],
+                    origin: { y: 0.62 }
+                });
+                showToast(`${kid.name} claimed ${reward.title}.`);
+            }
         } catch (error) {
             showToast(error.message, true);
         }
@@ -697,23 +756,33 @@ window.claimReward = async function(kidId, rewardId) {
 
 // --- Tab Navigation in Settings ---
 window.switchTab = function(tabName) {
-    const tabs = ['kids', 'chores', 'calendar', 'rewards'];
+    const tabs = ['kids', 'chores', 'household', 'activity', 'rewards'];
+    let activeButton = null;
     tabs.forEach(t => {
         const btn = document.getElementById(`tab-${t}`);
         const content = document.getElementById(`tab-content-${t}`);
         
         if (t === tabName) {
             if (btn) btn.classList.add('active');
+            activeButton = btn;
             if (content) content.classList.remove('hidden');
         } else {
             if (btn) btn.classList.remove('active');
             if (content) content.classList.add('hidden');
         }
     });
+
+    if (activeButton && window.matchMedia('(max-width: 800px)').matches) {
+        activeButton.scrollIntoView({ block: 'nearest', inline: 'center' });
+    }
     
     if (tabName === 'kids') renderSettingsKidsList();
     if (tabName === 'chores') renderSettingsChoresList();
-    if (tabName === 'calendar') renderSettingsEventsList();
+    if (tabName === 'household') {
+        populateExceptionMemberSelect();
+        renderHouseholdSettings();
+    }
+    if (tabName === 'activity') renderActivitySettings();
     if (tabName === 'rewards') {
         renderSettingsRewardsList();
         updatePinSecurityUI();
@@ -865,6 +934,8 @@ window.deleteKid = async function(id) {
         state.activeChores = state.activeChores.filter(ac => ac.kidId !== id);
         // Clean up chores templates specifically assigned to this kid, or reset them?
         state.chores = state.chores.filter(c => c.kidId !== id);
+        state.approvals = (state.approvals || []).filter(approval => approval.memberId !== id);
+        state.exceptions = (state.exceptions || []).filter(exception => exception.kidId !== id);
         
         saveAllToStorage();
         renderSettingsKidsList();
@@ -882,6 +953,9 @@ window.showAddChoreForm = function() {
     document.getElementById('chore-kid').value = 'all';
     document.getElementById('chore-frequency').value = 'daily';
     document.getElementById('chore-days-container').classList.add('hidden');
+    document.getElementById('chore-date-container').classList.add('hidden');
+    document.getElementById('chore-due-date').value = '';
+    document.getElementById('chore-requires-approval').checked = false;
     document.querySelectorAll('input[name="chore-days"]').forEach(cb => cb.checked = false);
 };
 
@@ -907,12 +981,17 @@ function populateChoreKidSelect() {
 window.handleChoreFrequencyChange = function() {
     const freq = document.getElementById('chore-frequency').value;
     const container = document.getElementById('chore-days-container');
+    const dateContainer = document.getElementById('chore-date-container');
+    const dueDate = document.getElementById('chore-due-date');
     if (freq === 'days') {
         container.classList.remove('hidden');
     } else {
         container.classList.add('hidden');
         document.querySelectorAll('input[name="chore-days"]').forEach(cb => cb.checked = false);
     }
+    dateContainer.classList.toggle('hidden', freq !== 'once');
+    dueDate.required = freq === 'once';
+    if (freq !== 'once') dueDate.value = '';
 };
 
 window.saveChore = function(event) {
@@ -922,6 +1001,8 @@ window.saveChore = function(event) {
     const points = parseInt(document.getElementById('chore-points').value);
     const kidId = document.getElementById('chore-kid').value;
     const frequency = document.getElementById('chore-frequency').value;
+    const dueDate = frequency === 'once' ? document.getElementById('chore-due-date').value : '';
+    const requiresApproval = document.getElementById('chore-requires-approval').checked;
     
     const daysOfWeek = [];
     if (frequency === 'days') {
@@ -939,6 +1020,9 @@ window.saveChore = function(event) {
             chore.kidId = kidId;
             chore.frequency = frequency;
             chore.daysOfWeek = daysOfWeek;
+            chore.dueDate = dueDate;
+            chore.requiresApproval = requiresApproval;
+            if (frequency !== 'once') chore.completedAt = '';
         }
         
         // Also update existing today's active chore instances if they match
@@ -949,7 +1033,8 @@ window.saveChore = function(event) {
                     title: title,
                     points: points,
                     frequency: frequency,
-                    daysOfWeek: daysOfWeek
+                    daysOfWeek: daysOfWeek,
+                    requiresApproval: requiresApproval
                 };
             }
             return ac;
@@ -963,7 +1048,10 @@ window.saveChore = function(event) {
             points: points,
             kidId: kidId,
             frequency: frequency,
-            daysOfWeek: daysOfWeek
+            daysOfWeek: daysOfWeek,
+            dueDate: dueDate,
+            requiresApproval: requiresApproval,
+            completedAt: ''
         });
     }
     
@@ -997,6 +1085,8 @@ function renderSettingsChoresList() {
             freqLabel = (chore.daysOfWeek && chore.daysOfWeek.length > 0) 
                 ? `Repeat: ${chore.daysOfWeek.join(', ')}` 
                 : 'Scheduled';
+        } else if (chore.frequency === 'once') {
+            freqLabel = `One time · ${chore.dueDate}`;
         }
         
         const item = document.createElement('div');
@@ -1009,6 +1099,7 @@ function renderSettingsChoresList() {
                         <span style="color:var(--color-primary); font-weight:700;">+${chore.points} pts</span>
                         &bull; ${escapeHTML(freqLabel)}
                         &bull; Assigned to: <strong>${escapeHTML(assignedName)}</strong>
+                        ${chore.requiresApproval ? '&bull; Approval required' : ''}
                     </div>
                 </div>
             </div>
@@ -1031,6 +1122,8 @@ window.editChore = function(id) {
     document.getElementById('chore-points').value = chore.points;
     document.getElementById('chore-kid').value = chore.kidId;
     document.getElementById('chore-frequency').value = chore.frequency;
+    document.getElementById('chore-due-date').value = chore.dueDate || '';
+    document.getElementById('chore-requires-approval').checked = Boolean(chore.requiresApproval);
     
     // Show/hide specific days checklist
     const daysContainer = document.getElementById('chore-days-container');
@@ -1046,6 +1139,8 @@ window.editChore = function(id) {
             cb.checked = false;
         });
     }
+    document.getElementById('chore-date-container').classList.toggle('hidden', chore.frequency !== 'once');
+    document.getElementById('chore-due-date').required = chore.frequency === 'once';
     
     document.getElementById('chore-form').classList.remove('hidden');
 };
@@ -1062,6 +1157,10 @@ window.deleteChore = async function(id) {
         });
         state.chores = state.chores.filter(c => c.id !== id);
         state.activeChores = state.activeChores.filter(ac => ac.choreId !== id);
+        const activeChoreIds = new Set(state.activeChores.map(active => active.id));
+        state.approvals = (state.approvals || []).filter(approval => (
+            approval.type !== 'chore' || activeChoreIds.has(approval.activeChoreId)
+        ));
         
         saveAllToStorage();
         renderSettingsChoresList();
@@ -1074,16 +1173,19 @@ window.saveReward = function(event) {
     event.preventDefault();
     const title = document.getElementById('reward-title').value.trim();
     const cost = parseInt(document.getElementById('reward-cost').value);
+    const requiresApproval = document.getElementById('reward-requires-approval').checked;
     
     if (title && cost > 0) {
         state.rewards.push({
             id: `reward-${Date.now()}`,
             title: title,
-            cost: cost
+            cost: cost,
+            requiresApproval: requiresApproval
         });
         saveAllToStorage();
         document.getElementById('reward-title').value = '';
         document.getElementById('reward-cost').value = '';
+        document.getElementById('reward-requires-approval').checked = false;
         renderSettingsRewardsList();
         renderDashboard();
     }
@@ -1106,6 +1208,7 @@ function renderSettingsRewardsList() {
                 <div>
                     <strong>${escapeHTML(reward.title)}</strong>
                     <div style="font-size:0.8rem; color:var(--color-accent); font-weight:700;">Cost: ${reward.cost} pts</div>
+                    ${reward.requiresApproval ? '<div class="settings-meta">Parent approval required</div>' : ''}
                 </div>
             </div>
             <div class="settings-item-actions">
@@ -1124,6 +1227,7 @@ window.deleteReward = async function(id) {
     const confirmed = await showConfirm("Delete Reward?", `Remove reward "${reward.title}"?`);
     if (confirmed) {
         state.rewards = state.rewards.filter(r => r.id !== id);
+        state.approvals = (state.approvals || []).filter(approval => approval.rewardId !== id);
         saveAllToStorage();
         renderSettingsRewardsList();
         renderDashboard();
@@ -1263,6 +1367,8 @@ function initEventListeners() {
     document.getElementById('chore-form')?.addEventListener('submit', saveChore);
     document.getElementById('event-form')?.addEventListener('submit', saveEvent);
     document.getElementById('reward-form')?.addEventListener('submit', saveReward);
+    document.getElementById('note-form')?.addEventListener('submit', saveNote);
+    document.getElementById('exception-form')?.addEventListener('submit', saveException);
     document.getElementById('chore-frequency')?.addEventListener('change', handleChoreFrequencyChange);
 
     document.addEventListener('click', event => {
@@ -1271,7 +1377,7 @@ function initEventListeners() {
         const action = trigger.dataset.action;
         const id = trigger.dataset.id;
         const actions = {
-            'open-calendar': () => openCalendarSettings(),
+            'open-household': () => openHouseholdSettings(),
             'scroll-panel': () => scrollToPanel(trigger.dataset.panel),
             'switch-tab': () => switchTab(trigger.dataset.tab),
             'show-add-kid': () => showAddKidForm(),
@@ -1291,7 +1397,11 @@ function initEventListeners() {
             'edit-chore': () => editChore(id),
             'delete-chore': () => deleteChore(id),
             'delete-reward': () => deleteReward(id),
-            'delete-event': () => deleteEvent(id)
+            'delete-event': () => deleteEvent(id),
+            'delete-note': () => deleteNote(id),
+            'delete-exception': () => deleteException(id),
+            'approve-request': () => reviewApproval(id, 'approve'),
+            'reject-request': () => reviewApproval(id, 'reject')
         };
         actions[action]?.();
     });
@@ -1330,6 +1440,7 @@ async function openSettingsForTab(tabName = 'kids') {
     }
     document.getElementById('settings-modal').classList.remove('hidden');
     populateChoreKidSelect();
+    populateExceptionMemberSelect();
     switchTab(tabName);
 }
 
@@ -1338,69 +1449,287 @@ window.scrollToPanel = function(panelId) {
 };
 
 // ==========================================
-// FAMILY CALENDAR & AGENDA WIDGET
+// HOUSEHOLD UP NEXT
 // ==========================================
 
+function friendlyDateLabel(value) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value || '')) return '';
+    const today = getTodayString();
+    if (value === today) return 'Today';
+    const [year, month, day] = value.split('-').map(Number);
+    const [todayYear, todayMonth, todayDay] = today.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    const todayDate = new Date(todayYear, todayMonth - 1, todayDay);
+    const difference = Math.round((date - todayDate) / 86400000);
+    if (difference === 1) return 'Tomorrow';
+    if (difference < 0) return `${Math.abs(difference)}d overdue`;
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 function renderSidebarEventsList() {
-    const container = document.getElementById('sidebar-events-list');
+    const container = document.getElementById('sidebar-up-next-list');
+    if (!container) return;
+    const today = getTodayString();
+    const items = [];
+
+    (state.approvals || []).forEach(approval => items.push({
+        priority: 0,
+        date: today,
+        icon: approval.type === 'chore' ? 'badge-check' : 'gift',
+        color: '#f0bd3d',
+        title: `${approval.memberName} · ${approval.title}`,
+        meta: approval.type === 'chore' ? 'Chore needs approval' : 'Reward request'
+    }));
+
+    (state.notes || []).filter(note => !note.expiresDate || note.expiresDate >= today).forEach(note => items.push({
+        priority: 1,
+        date: note.expiresDate || today,
+        icon: 'pin',
+        color: '#3fa675',
+        title: note.text,
+        meta: note.expiresDate ? `Household note · through ${friendlyDateLabel(note.expiresDate)}` : 'Household note'
+    }));
+
+    (state.chores || []).filter(chore => chore.frequency === 'once' && chore.dueDate && !chore.completedAt).forEach(chore => {
+        const member = chore.kidId === 'all' ? null : state.kids.find(item => item.id === chore.kidId);
+        items.push({
+            priority: 2,
+            date: chore.dueDate,
+            icon: 'circle-check-big',
+            color: member?.color || '#4f7cff',
+            title: chore.title,
+            meta: `${member?.name || 'Everyone'} · ${friendlyDateLabel(chore.dueDate)}`
+        });
+    });
+
+    (state.exceptions || []).filter(exception => exception.endDate >= today).forEach(exception => {
+        const member = exception.kidId === 'all' ? null : state.kids.find(item => item.id === exception.kidId);
+        items.push({
+            priority: 3,
+            date: exception.startDate,
+            icon: 'pause',
+            color: '#e84d63',
+            title: exception.reason || 'Routines paused',
+            meta: `${member?.name || 'Everyone'} · ${friendlyDateLabel(exception.startDate)}–${friendlyDateLabel(exception.endDate)}`
+        });
+    });
+
+    (state.events || []).filter(event => event.date >= today).forEach(event => items.push({
+        priority: 4,
+        date: event.date,
+        icon: 'calendar-days',
+        color: safeColor(event.color),
+        title: event.title,
+        meta: event.time ? `${friendlyDateLabel(event.date)} · ${event.time}` : friendlyDateLabel(event.date)
+    }));
+
+    items.sort((a, b) => a.priority - b.priority || a.date.localeCompare(b.date) || a.title.localeCompare(b.title));
+    container.innerHTML = '';
+    if (!items.length) {
+        container.innerHTML = '<div class="up-next-empty"><i data-lucide="check-check"></i><span>Nothing needs attention.</span></div>';
+    } else {
+        items.slice(0, 7).forEach(entry => {
+            const item = document.createElement('div');
+            item.className = 'sidebar-event-item up-next-item';
+            item.innerHTML = `
+                <span class="up-next-icon" style="--item-color:${safeColor(entry.color)}"><i data-lucide="${entry.icon}"></i></span>
+                <span class="sidebar-event-details">
+                    <span class="sidebar-event-title">${escapeHTML(entry.title)}</span>
+                    <span class="sidebar-event-time">${escapeHTML(entry.meta)}</span>
+                </span>`;
+            container.appendChild(item);
+        });
+    }
+    if (window.lucide) lucide.createIcons();
+}
+
+function populateExceptionMemberSelect() {
+    const select = document.getElementById('exception-member');
+    if (!select) return;
+    const selected = select.value || 'all';
+    select.innerHTML = '<option value="all">Everyone</option>';
+    state.kids.forEach(member => {
+        const option = document.createElement('option');
+        option.value = member.id;
+        option.innerText = member.name;
+        select.appendChild(option);
+    });
+    select.value = [...select.options].some(option => option.value === selected) ? selected : 'all';
+}
+
+function renderHouseholdSettings() {
+    renderSettingsNotesList();
+    renderSettingsExceptionsList();
+    renderSettingsEventsList();
+    const today = getTodayString();
+    if (!document.getElementById('exception-start').value) document.getElementById('exception-start').value = today;
+    if (!document.getElementById('exception-end').value) document.getElementById('exception-end').value = today;
+}
+
+window.saveNote = async function(event) {
+    event.preventDefault();
+    const text = document.getElementById('note-text').value.trim();
+    const expiresDate = document.getElementById('note-expires').value;
+    if (!text) return;
+    state.notes.push({ id: `note-${Date.now()}`, text, expiresDate, createdAt: new Date().toISOString() });
+    if (!await saveAllToStorage()) return;
+    document.getElementById('note-text').value = '';
+    document.getElementById('note-expires').value = '';
+    renderSettingsNotesList();
+    renderSidebarEventsList();
+};
+
+function renderSettingsNotesList() {
+    const container = document.getElementById('notes-list-container');
     if (!container) return;
     container.innerHTML = '';
-    
-    const todayStr = getTodayString();
-    
-    // Filter out events that are older than today (comparing dates as strings)
-    const activeEvents = (state.events || []).filter(ev => ev.date >= todayStr);
-    
-    // Sort events chronologically
-    activeEvents.sort((a, b) => {
-        if (a.date !== b.date) return a.date.localeCompare(b.date);
-        return (a.time || '').localeCompare(b.time || '');
-    });
-    
-    if (activeEvents.length === 0) {
-        container.innerHTML = `<div style="text-align:center; color:var(--text-dim); padding:1rem; font-size:0.8rem;">No events scheduled.</div>`;
+    if (!(state.notes || []).length) {
+        container.innerHTML = '<div class="settings-empty">No household notes.</div>';
         return;
     }
-    
-    // Get names of weekdays for friendly display
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    
-    activeEvents.slice(0, 4).forEach(ev => { // Limit to 4 events on sidebar for height limits
-        // Format date nicely (e.g. "Today", "Tomorrow", "Mon, Jul 20")
-        let dateLabel = '';
-        if (ev.date === todayStr) {
-            dateLabel = 'Today';
-        } else {
-            const evParts = ev.date.split('-').map(Number);
-            const todayParts = todayStr.split('-').map(Number);
-            const evDate = new Date(evParts[0], evParts[1] - 1, evParts[2]);
-            const todayDate = new Date(todayParts[0], todayParts[1] - 1, todayParts[2]);
-            const relativeDiff = Math.round((evDate - todayDate) / (1000 * 60 * 60 * 24));
-            
-            if (relativeDiff === 1) {
-                dateLabel = 'Tomorrow';
-            } else {
-                const weekday = days[evDate.getDay()];
-                const month = evDate.toLocaleDateString('en-US', { month: 'short' });
-                const dayNum = evDate.getDate();
-                dateLabel = `${weekday}, ${month} ${dayNum}`;
-            }
-        }
-        
-        const timeLabel = ev.time ? `${dateLabel} • ${ev.time}` : dateLabel;
-        
+    [...state.notes].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).forEach(note => {
         const item = document.createElement('div');
-        item.className = 'sidebar-event-item';
+        item.className = 'settings-list-item';
         item.innerHTML = `
-            <div class="sidebar-event-dot" style="background-color: ${safeColor(ev.color)};"></div>
-            <div class="sidebar-event-details">
-                <span class="sidebar-event-title">${escapeHTML(ev.title)}</span>
-                <span class="sidebar-event-time">${escapeHTML(timeLabel)}</span>
+            <div class="settings-list-item-info">
+                <i data-lucide="pin"></i>
+                <div><strong>${escapeHTML(note.text)}</strong><div class="settings-meta">${note.expiresDate ? `Through ${escapeHTML(friendlyDateLabel(note.expiresDate))}` : 'No expiration'}</div></div>
             </div>
-        `;
+            <div class="settings-item-actions"><button type="button" aria-label="Delete note" data-action="delete-note" data-id="${note.id}" class="icon-only-btn delete"><i data-lucide="trash-2"></i></button></div>`;
         container.appendChild(item);
     });
+    if (window.lucide) lucide.createIcons();
 }
+
+window.deleteNote = async function(id) {
+    state.notes = (state.notes || []).filter(note => note.id !== id);
+    if (!await saveAllToStorage()) return;
+    renderSettingsNotesList();
+    renderSidebarEventsList();
+};
+
+window.saveException = async function(event) {
+    event.preventDefault();
+    const kidId = document.getElementById('exception-member').value;
+    const reason = document.getElementById('exception-reason').value.trim();
+    const startDate = document.getElementById('exception-start').value;
+    const endDate = document.getElementById('exception-end').value;
+    if (!startDate || !endDate || endDate < startDate) {
+        showToast('Pause end date must be on or after its start date.', true);
+        return;
+    }
+    state.exceptions.push({ id: `pause-${Date.now()}`, kidId, startDate, endDate, reason });
+    if (!await saveAllToStorage()) return;
+    document.getElementById('exception-reason').value = '';
+    renderSettingsExceptionsList();
+    renderDashboard();
+    renderSidebarEventsList();
+};
+
+function renderSettingsExceptionsList() {
+    const container = document.getElementById('exceptions-list-container');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!(state.exceptions || []).length) {
+        container.innerHTML = '<div class="settings-empty">No routine pauses.</div>';
+        return;
+    }
+    [...state.exceptions].sort((a, b) => b.endDate.localeCompare(a.endDate)).forEach(exception => {
+        const member = exception.kidId === 'all' ? null : state.kids.find(item => item.id === exception.kidId);
+        const item = document.createElement('div');
+        item.className = 'settings-list-item';
+        item.innerHTML = `
+            <div class="settings-list-item-info">
+                <i data-lucide="pause"></i>
+                <div><strong>${escapeHTML(exception.reason || 'Routines paused')}</strong><div class="settings-meta">${escapeHTML(member?.name || 'Everyone')} · ${escapeHTML(exception.startDate)} through ${escapeHTML(exception.endDate)}</div></div>
+            </div>
+            <div class="settings-item-actions"><button type="button" aria-label="Delete routine pause" data-action="delete-exception" data-id="${exception.id}" class="icon-only-btn delete"><i data-lucide="trash-2"></i></button></div>`;
+        container.appendChild(item);
+    });
+    if (window.lucide) lucide.createIcons();
+}
+
+window.deleteException = async function(id) {
+    state.exceptions = (state.exceptions || []).filter(exception => exception.id !== id);
+    if (!await saveAllToStorage()) return;
+    renderSettingsExceptionsList();
+    renderDashboard();
+    renderSidebarEventsList();
+};
+
+function renderActivitySettings() {
+    const approvalsContainer = document.getElementById('approvals-list-container');
+    const historyContainer = document.getElementById('history-list-container');
+    if (!approvalsContainer || !historyContainer) return;
+    approvalsContainer.innerHTML = '';
+    if (!(state.approvals || []).length) {
+        approvalsContainer.innerHTML = '<div class="settings-empty"><i data-lucide="check-check"></i> Nothing needs approval.</div>';
+    } else {
+        [...state.approvals].sort((a, b) => a.requestedAt.localeCompare(b.requestedAt)).forEach(approval => {
+            const item = document.createElement('div');
+            item.className = 'settings-list-item approval-request';
+            item.innerHTML = `
+                <div class="settings-list-item-info">
+                    <i data-lucide="${approval.type === 'chore' ? 'badge-check' : 'gift'}"></i>
+                    <div><strong>${escapeHTML(approval.memberName)} · ${escapeHTML(approval.title)}</strong><div class="settings-meta">${approval.type === 'chore' ? `Award ${approval.points} points` : `Spend ${approval.points} points`} · ${escapeHTML(formatActivityTime(approval.requestedAt))}</div></div>
+                </div>
+                <div class="approval-actions">
+                    <button type="button" class="icon-only-btn delete" data-action="reject-request" data-id="${approval.id}" aria-label="Reject request"><i data-lucide="x"></i></button>
+                    <button type="button" class="icon-only-btn approve" data-action="approve-request" data-id="${approval.id}" aria-label="Approve request"><i data-lucide="check"></i></button>
+                </div>`;
+            approvalsContainer.appendChild(item);
+        });
+    }
+
+    historyContainer.innerHTML = '';
+    const history = [...(state.history || [])].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0, 100);
+    if (!history.length) {
+        historyContainer.innerHTML = '<div class="settings-empty">Completed chores and claimed rewards will appear here.</div>';
+    } else {
+        history.forEach(entry => {
+            const row = document.createElement('div');
+            row.className = 'activity-row';
+            const icon = entry.type === 'reward_claimed' ? 'gift' : entry.type === 'chore_reopened' ? 'undo-2' : 'check';
+            const verb = entry.type === 'reward_claimed' ? 'claimed' : entry.type === 'chore_reopened' ? 'reopened' : 'completed';
+            row.innerHTML = `
+                <span class="activity-icon"><i data-lucide="${icon}"></i></span>
+                <span class="activity-copy"><strong>${escapeHTML(entry.memberName)}</strong> ${verb} ${escapeHTML(entry.title)}<small>${escapeHTML(formatActivityTime(entry.occurredAt))}</small></span>
+                <span class="activity-points ${entry.points < 0 ? 'negative' : ''}">${entry.points > 0 ? '+' : ''}${entry.points}</span>`;
+            historyContainer.appendChild(row);
+        });
+    }
+    if (window.lucide) lucide.createIcons();
+}
+
+function formatActivityTime(value) {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    const day = getTodayString() === `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+        ? 'Today'
+        : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${day} · ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+}
+
+window.reviewApproval = async function(id, action) {
+    try {
+        const response = await fetch(`/api/admin/approvals/${encodeURIComponent(id)}/${action}`, { method: 'POST' });
+        const envelope = await response.json();
+        if (response.status === 401) {
+            document.getElementById('settings-modal').classList.add('hidden');
+            openPinModal('activity');
+            return;
+        }
+        if (!response.ok) throw new Error(envelope.error || 'Request could not be reviewed');
+        applyServerEnvelope(envelope);
+        renderActivitySettings();
+        if (action === 'approve') {
+            celebrate({ particleCount: 36, spread: 54, origin: { y: 0.7 } });
+            showToast('Request approved.');
+        } else showToast('Request declined.');
+    } catch (error) {
+        showToast(error.message, true);
+    }
+};
 
 function renderSettingsEventsList() {
     const container = document.getElementById('events-list-container');
@@ -1579,6 +1908,7 @@ window.pressPinKey = function(num) {
                 closePinModal();
                 document.getElementById('settings-modal').classList.remove('hidden');
                 populateChoreKidSelect();
+                populateExceptionMemberSelect();
                 switchTab(targetSettingsTab);
                 return;
                 }
@@ -1620,7 +1950,6 @@ function updatePinDotsDisplay() {
     });
 }
 
-// Global click handler for family calendar widget
-window.openCalendarSettings = function() {
-    openSettingsForTab('calendar');
+window.openHouseholdSettings = function() {
+    openSettingsForTab('household');
 };

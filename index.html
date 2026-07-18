@@ -8,7 +8,7 @@
     <link rel="icon" href="/chorestar-mark.svg" type="image/svg+xml">
     <script src="/vendor/lucide.js" defer></script>
     <script src="/vendor/confetti.js" defer></script>
-    <link rel="stylesheet" href="styles.css?v=0.0.1-beta.5">
+    <link rel="stylesheet" href="styles.css?v=0.0.1-beta.6">
 </head>
 <body>
     <div class="dashboard-container">
@@ -52,18 +52,18 @@
 
         <aside class="sidebar" id="schedule-panel">
             <div class="rail-heading">
-                <span class="section-kicker">Coming up</span>
-                <h2>Family schedule</h2>
+                <span class="section-kicker">Household</span>
+                <h2>Up next</h2>
             </div>
-            <button class="family-events-card" type="button" data-action="open-calendar">
-                <div id="sidebar-events-list" class="sidebar-events-list"></div>
-                <span class="schedule-edit"><i data-lucide="calendar-plus"></i> Edit schedule</span>
+            <button class="family-events-card" type="button" data-action="open-household">
+                <div id="sidebar-up-next-list" class="sidebar-events-list"></div>
+                <span class="schedule-edit"><i data-lucide="sliders-horizontal"></i> Manage household</span>
             </button>
             <div class="sidebar-note">
                 <span class="status-dot"></span>
                 <span id="sync-status">Synced to this household</span>
             </div>
-            <div class="brand-footer"><span id="app-version">Beta 4</span></div>
+            <div class="brand-footer"><span id="app-version">Beta 6</span></div>
         </aside>
 
         <main class="main-content" id="today-panel">
@@ -87,7 +87,7 @@
 
         <nav class="mobile-nav" aria-label="Dashboard navigation">
             <button type="button" data-action="scroll-panel" data-panel="today-panel"><i data-lucide="list-checks"></i><span>Today</span></button>
-            <button type="button" data-action="scroll-panel" data-panel="schedule-panel"><i data-lucide="calendar-days"></i><span>Schedule</span></button>
+            <button type="button" data-action="scroll-panel" data-panel="schedule-panel"><i data-lucide="list-todo"></i><span>Up next</span></button>
             <button type="button" id="btn-settings-mobile"><i data-lucide="settings-2"></i><span>Manage</span></button>
         </nav>
     </div>
@@ -103,7 +103,8 @@
             <div class="modal-tabs">
                 <button id="tab-kids" class="tab-btn active" type="button" data-action="switch-tab" data-tab="kids">Family Members</button>
                 <button id="tab-chores" class="tab-btn" type="button" data-action="switch-tab" data-tab="chores">Chores</button>
-                <button id="tab-calendar" class="tab-btn" type="button" data-action="switch-tab" data-tab="calendar">Calendar</button>
+                <button id="tab-household" class="tab-btn" type="button" data-action="switch-tab" data-tab="household">Household</button>
+                <button id="tab-activity" class="tab-btn" type="button" data-action="switch-tab" data-tab="activity">Activity</button>
                 <button id="tab-rewards" class="tab-btn" type="button" data-action="switch-tab" data-tab="rewards">Rewards & Security</button>
             </div>
 
@@ -214,9 +215,22 @@
                                 <option value="daily">Daily</option>
                                 <option value="weekly">Weekly</option>
                                 <option value="days">Specific Days</option>
+                                <option value="once">One Time</option>
                             </select>
                         </div>
                     </div>
+
+                    <div id="chore-date-container" class="form-row hidden">
+                        <div class="form-group">
+                            <label for="chore-due-date">Due Date</label>
+                            <input type="date" id="chore-due-date">
+                        </div>
+                    </div>
+
+                    <label class="setting-toggle-row" for="chore-requires-approval">
+                        <span><strong>Parent approval</strong><small>Award points after a parent reviews completion.</small></span>
+                        <input type="checkbox" id="chore-requires-approval">
+                    </label>
                     
                     <!-- Days of Week check grid (Visible only when 'days' is selected) -->
                     <div id="chore-days-container" class="form-row hidden" style="margin-top: 0.5rem;">
@@ -245,13 +259,58 @@
                 </div>
             </div>
 
-            <!-- Tab Content: Calendar -->
-            <div id="tab-content-calendar" class="tab-content hidden">
+            <!-- Tab Content: Household -->
+            <div id="tab-content-household" class="tab-content hidden">
                 <div class="section-header">
-                    <h3>Family Calendar & Agenda</h3>
+                    <h3>Household</h3>
                 </div>
-                
-                <form id="event-form" class="settings-form">
+
+                <div class="admin-option-group">
+                    <h4>Household Notes</h4>
+                    <form id="note-form" class="settings-form-inline household-inline-form">
+                        <input type="text" id="note-text" maxlength="240" placeholder="e.g. Trash pickup is early tomorrow" required>
+                        <div class="form-group compact-field">
+                            <label for="note-expires">Show Through</label>
+                            <input type="date" id="note-expires">
+                        </div>
+                        <button type="submit" class="primary-btn-sm"><i data-lucide="plus"></i> Add Note</button>
+                    </form>
+                    <div id="notes-list-container" class="settings-list"></div>
+                </div>
+
+                <div class="admin-option-group">
+                    <h4>Routine Pauses</h4>
+                    <form id="exception-form" class="settings-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="exception-member">Pause For</label>
+                                <select id="exception-member"><option value="all">Everyone</option></select>
+                            </div>
+                            <div class="form-group">
+                                <label for="exception-reason">Reason</label>
+                                <input type="text" id="exception-reason" maxlength="120" placeholder="e.g. Family vacation">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="exception-start">Start Date</label>
+                                <input type="date" id="exception-start" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="exception-end">End Date</label>
+                                <input type="date" id="exception-end" required>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="submit-btn"><i data-lucide="pause"></i> Pause Routines</button>
+                        </div>
+                    </form>
+                    <div id="exceptions-list-container" class="settings-list"></div>
+                </div>
+
+                <div class="admin-option-group">
+                    <h4>Schedule Entries</h4>
+                    <form id="event-form" class="settings-form">
                     <div class="form-row">
                         <div class="form-group">
                             <label for="event-title">Event Title</label>
@@ -280,10 +339,24 @@
                     <div class="form-actions">
                         <button type="submit" class="submit-btn"><i data-lucide="plus-circle"></i> Add Event</button>
                     </div>
-                </form>
+                    </form>
 
-                <div id="events-list-container" class="settings-list">
-                    <!-- Loaded dynamically -->
+                    <div id="events-list-container" class="settings-list"></div>
+                </div>
+            </div>
+
+            <!-- Tab Content: Activity -->
+            <div id="tab-content-activity" class="tab-content hidden">
+                <div class="section-header">
+                    <h3>Activity</h3>
+                </div>
+                <div class="admin-option-group">
+                    <h4>Needs Approval</h4>
+                    <div id="approvals-list-container" class="settings-list"></div>
+                </div>
+                <div class="admin-option-group">
+                    <h4>Completion History</h4>
+                    <div id="history-list-container" class="activity-history"></div>
                 </div>
             </div>
 
@@ -306,9 +379,10 @@
                         <h4>Reward Goals</h4>
                         <p class="description">Add special achievements kids can claim once they earn enough points.</p>
                         
-                        <form id="reward-form" class="settings-form-inline">
+                        <form id="reward-form" class="settings-form-inline reward-form-grid">
                             <input type="text" id="reward-title" placeholder="Reward description (e.g. 1 hour of screen time)" required>
                             <input type="number" id="reward-cost" placeholder="Points cost (e.g. 50)" required min="5">
+                            <label class="inline-check"><input type="checkbox" id="reward-requires-approval"> Parent approval</label>
                             <button type="submit" class="primary-btn-sm"><i data-lucide="plus"></i> Add Goal</button>
                         </form>
                         
@@ -386,6 +460,6 @@
 
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-    <script src="app.js?v=0.0.1-beta.5"></script>
+    <script src="app.js?v=0.0.1-beta.6"></script>
 </body>
 </html>
