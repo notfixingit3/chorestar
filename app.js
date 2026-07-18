@@ -2,7 +2,7 @@
    FAMILY CHORE DASHBOARD - LOGIC
    ========================================== */
 
-const APP_VERSION = 'v0.0.1-beta.2';
+const APP_VERSION = 'v0.0.1-beta.3';
 
 // --- Constants & State ---
 const STORAGE_KEYS = {
