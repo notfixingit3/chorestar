@@ -2,7 +2,7 @@
    FAMILY CHORE DASHBOARD - LOGIC
    ========================================== */
 
-const APP_VERSION = '0.0.1-beta.4';
+const APP_VERSION = '0.0.1-beta.5';
 
 // --- Constants & State ---
 const STORAGE_KEYS = {
@@ -38,10 +38,10 @@ function getRelativeDateString(offsetDays) {
 // --- Initial Demo Data Seed ---
 const DEMO_DATA = {
     kids: [
-        { id: 'kid-one', name: 'Kid 1', color: '#e84d8a', points: 0, role: 'kid', avatar: 'S' },
-        { id: 'kid-two', name: 'Kid 2', color: '#4f7cff', points: 0, role: 'kid', avatar: 'A' },
-        { id: 'parent-one', name: 'Parent 1', color: '#f0bd3d', points: 0, role: 'parent', avatar: 'T' },
-        { id: 'parent-two', name: 'Parent 2', color: '#3fa675', points: 0, role: 'parent', avatar: 'J' }
+        { id: 'kid-one', name: 'Kid 1', color: '#e84d8a', points: 0, role: 'kid', avatar: 'K1' },
+        { id: 'kid-two', name: 'Kid 2', color: '#4f7cff', points: 0, role: 'kid', avatar: 'K2' },
+        { id: 'parent-one', name: 'Parent 1', color: '#f0bd3d', points: 0, role: 'parent', avatar: 'P1' },
+        { id: 'parent-two', name: 'Parent 2', color: '#3fa675', points: 0, role: 'parent', avatar: 'P2' }
     ],
     chores: [
         { id: 'chore-1', title: 'Make your bed', points: 5, frequency: 'daily', kidId: 'all' },
@@ -58,8 +58,8 @@ const DEMO_DATA = {
         { id: 'reward-4', title: 'New Toy under $10', cost: 100 }
     ],
     events: [
-        { id: 'event-1', title: 'Kid 1: Soccer Practice', date: getRelativeDateString(0), time: '5:00 PM', color: '#ec4899' },
-        { id: 'event-2', title: 'Kid 2: Dentist Appointment', date: getRelativeDateString(1), time: '10:00 AM', color: '#3b82f6' },
+        { id: 'event-1', title: 'Soccer practice', date: getRelativeDateString(0), time: '5:00 PM', color: '#ec4899' },
+        { id: 'event-2', title: 'Dentist appointment', date: getRelativeDateString(1), time: '10:00 AM', color: '#3b82f6' },
         { id: 'event-3', title: 'Family Movie Night 🍿', date: getRelativeDateString(2), time: '7:00 PM', color: '#10b981' }
     ],
     lastResetDate: ''
@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initEventListeners();
     initWakeLock();
     if (window.lucide) lucide.createIcons();
-    document.getElementById('app-version').innerText = `Beta 4 · ${APP_VERSION}`;
+    document.getElementById('app-version').innerText = `Beta 5 · ${APP_VERSION}`;
     
     await syncWithServer();
     startServerSyncPolling();
@@ -95,16 +95,10 @@ function loadLocalCache() {
 
         if (storedKids && storedChores) {
             state.kids = JSON.parse(storedKids);
-            // Ensure kids have role and avatar, migrate old data
+            // Ensure older local caches have the fields introduced by later releases.
             state.kids.forEach(k => {
                 if (!k.role) k.role = 'kid';
-                if (!k.avatar) {
-                    if (k.name === 'Kid 1') k.avatar = '🦄';
-                    else if (k.name === 'Kid 2') k.avatar = '🎮';
-                    else if (k.name === 'Parent 1') k.avatar = '👨';
-                    else if (k.name === 'Parent 2') k.avatar = '👩';
-                    else k.avatar = k.name.charAt(0).toUpperCase();
-                }
+                if (!k.avatar) k.avatar = k.name.charAt(0).toUpperCase();
             });
             state.chores = JSON.parse(storedChores);
             state.activeChores = storedActive ? JSON.parse(storedActive) : [];
@@ -143,7 +137,7 @@ function applyServerEnvelope(envelope, rerender = true) {
     state = envelope.state;
     stateRevision = Number(envelope.revision) || 0;
     pinEnabled = Boolean(envelope.pinEnabled);
-    if (envelope.version) document.getElementById('app-version').innerText = `Beta 4 · ${envelope.version}`;
+    if (envelope.version) document.getElementById('app-version').innerText = `Beta 5 · ${envelope.version}`;
     lastStateString = JSON.stringify(state);
     saveLocalCache();
     setSyncStatus(true);

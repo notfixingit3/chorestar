@@ -1,6 +1,6 @@
 {
   "name": "chorestar",
-  "version": "0.0.1-beta.4",
+  "version": "0.0.1-beta.5",
   "description": "Multi-device synchronized family chores list",
   "main": "server.js",
   "scripts": {

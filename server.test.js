@@ -23,12 +23,57 @@ test('first run returns a complete seeded dashboard', async () => {
         const response = await fetch(`${baseUrl}/api/state`);
         const body = await response.json();
         assert.equal(response.status, 200);
-        assert.equal(body.version, '0.0.1-beta.4');
+        assert.equal(body.version, '0.0.1-beta.5');
         assert.ok(body.state.kids.length >= 1);
         assert.ok(body.state.activeChores.length >= 1);
         assert.match(body.state.lastResetDate, /^\d{4}-\d{2}-\d{2}$/);
         assert.equal(body.pinEnabled, false);
     });
+});
+
+test('upgrade preserves an existing household state file', async () => {
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'chorestar-upgrade-'));
+    const stateFile = path.join(dataDir, 'state.json');
+    const existing = {
+        revision: 42,
+        pinHash: 'stored-pin-hash',
+        state: {
+            kids: [
+                { id: 'existing-child', name: 'Existing Child', color: '#123456', points: 87, role: 'kid', avatar: 'EC' },
+                { id: 'existing-parent', name: 'Existing Parent', color: '#654321', points: 0, role: 'parent', avatar: 'EP' }
+            ],
+            chores: [
+                { id: 'existing-chore', title: 'Existing chore', points: 13, frequency: 'weekly', daysOfWeek: [], kidId: 'existing-child' }
+            ],
+            activeChores: [{
+                id: 'existing-active',
+                choreId: 'existing-chore',
+                kidId: 'existing-child',
+                title: 'Existing chore',
+                points: 13,
+                frequency: 'weekly',
+                daysOfWeek: [],
+                completed: true,
+                dateAssigned: '2026-07-01'
+            }],
+            rewards: [{ id: 'existing-reward', title: 'Existing reward', cost: 75 }],
+            events: [{ id: 'existing-event', title: 'Existing event', date: '2026-08-01', time: '6:30 PM', color: '#123456' }],
+            lastResetDate: new Date().toLocaleDateString('en-CA')
+        }
+    };
+    fs.writeFileSync(stateFile, JSON.stringify(existing));
+
+    const server = createApp({ dataDir }).listen(0, '127.0.0.1');
+    await new Promise(resolve => server.once('listening', resolve));
+    try {
+        const body = await fetch(`http://127.0.0.1:${server.address().port}/api/state`).then(response => response.json());
+        assert.equal(body.revision, existing.revision);
+        assert.equal(body.pinEnabled, true);
+        assert.deepEqual(body.state, existing.state);
+    } finally {
+        await new Promise(resolve => server.close(resolve));
+        fs.rmSync(dataDir, { recursive: true, force: true });
+    }
 });
 
 test('only public assets are served', async () => {

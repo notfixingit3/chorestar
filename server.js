@@ -30,10 +30,10 @@ function relativeDateString(offsetDays) {
 function createDefaultState() {
     return {
         kids: [
-            { id: 'kid-one', name: 'Kid 1', color: '#e84d8a', points: 0, role: 'kid', avatar: 'S' },
-            { id: 'kid-two', name: 'Kid 2', color: '#4f7cff', points: 0, role: 'kid', avatar: 'A' },
-            { id: 'parent-one', name: 'Parent 1', color: '#f0bd3d', points: 0, role: 'parent', avatar: 'T' },
-            { id: 'parent-two', name: 'Parent 2', color: '#3fa675', points: 0, role: 'parent', avatar: 'J' }
+            { id: 'kid-one', name: 'Kid 1', color: '#e84d8a', points: 0, role: 'kid', avatar: 'K1' },
+            { id: 'kid-two', name: 'Kid 2', color: '#4f7cff', points: 0, role: 'kid', avatar: 'K2' },
+            { id: 'parent-one', name: 'Parent 1', color: '#f0bd3d', points: 0, role: 'parent', avatar: 'P1' },
+            { id: 'parent-two', name: 'Parent 2', color: '#3fa675', points: 0, role: 'parent', avatar: 'P2' }
         ],
         chores: [
             { id: 'chore-1', title: 'Make your bed', points: 5, frequency: 'daily', daysOfWeek: [], kidId: 'all' },

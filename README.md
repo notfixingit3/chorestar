@@ -71,7 +71,7 @@ docker run -d \
   --restart unless-stopped \
   -p 8282:80 \
   -v "$PWD/data:/app/data" \
-  ghcr.io/notfixingit3/chorestar:0.0.1-beta.4
+  ghcr.io/notfixingit3/chorestar:0.0.1-beta.5
 ```
 
 Open `http://<docker-host>:8282` and confirm the container is healthy:
@@ -91,7 +91,7 @@ ssh house@docker1
 cd /opt/stacks/chorestar
 
 mkdir -p data
-printf 'CHORESTAR_TAG=0.0.1-beta.4\n' > .env
+printf 'CHORESTAR_TAG=0.0.1-beta.5\n' > .env
 
 docker compose pull
 docker compose up -d
@@ -134,7 +134,7 @@ docker build -t chorestar:local .
 ## Data And Security
 
 - Runtime data lives in `data/state.json`; mount `/app/data` to persistent storage.
-- Existing pre-beta.4 state files are migrated when read.
+- Existing state files are migrated when read; upgrading does not replace household members or reset their data.
 - Legacy plaintext PINs are converted to a salted scrypt hash on the next write.
 - The parent PIN is never returned as part of browser state.
 - Only the application shell and explicitly allowed bundled assets are publicly served.
@@ -146,10 +146,10 @@ ChoreStar is designed for a trusted household network. Put it behind HTTPS and a
 
 Pushes to `dev` run the test suite and publish a development container. Tags matching `v*` publish semver container tags through [GitHub Actions](.github/workflows/docker-publish.yml).
 
-For example, tag `v0.0.1-beta.4` publishes:
+For example, tag `v0.0.1-beta.5` publishes:
 
 ```text
-ghcr.io/notfixingit3/chorestar:0.0.1-beta.4
+ghcr.io/notfixingit3/chorestar:0.0.1-beta.5
 ```
 
 The application version is read from `package.json` and exposed by both `/healthz` and `/api/state`.
