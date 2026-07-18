@@ -1,12 +1,9 @@
 services:
   chorestar:
-    build: .
+    image: ghcr.io/notfixingit3/chorestar:dev
     container_name: chorestar
     ports:
       - "8282:80"
-    volumes:
-      # Mount the stack directory so changes are instantly reflected without rebuilding
-      - .:/usr/share/nginx/html
     networks:
       - groundzero
     restart: unless-stopped
