@@ -4,6 +4,8 @@ services:
     container_name: chorestar
     ports:
       - "8282:80"
+    volumes:
+      - ./data:/app/data
     networks:
       - groundzero
     restart: unless-stopped

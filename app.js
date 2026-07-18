@@ -64,7 +64,7 @@ const DEMO_DATA = {
 
 // --- App Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
-    loadData();
+    loadLocalCache();
     initClock();
     checkDailyReset();
     renderDashboard();
@@ -72,10 +72,15 @@ document.addEventListener('DOMContentLoaded', () => {
     initEventListeners();
     initWakeLock();
     lucide.createIcons();
+    
+    // Start background syncing with the Node server for multi-device support
+    startServerSyncPolling();
 });
 
-// --- Data Management (LocalStorage) ---
-function loadData() {
+// --- Data Management (LocalStorage Cache & Server Sync) ---
+let lastStateString = '';
+
+function loadLocalCache() {
     try {
         const storedKids = localStorage.getItem(STORAGE_KEYS.KIDS);
         const storedChores = localStorage.getItem(STORAGE_KEYS.CHORES);
@@ -109,11 +114,13 @@ function loadData() {
             }
             state.parentPin = storedPin || '';
             state.lastResetDate = storedReset || '';
+            lastStateString = JSON.stringify(state);
         } else {
             // Seed with Demo Data first time
             state = { ...DEMO_DATA };
             state.lastResetDate = getTodayString();
-            saveAllToStorage();
+            saveLocalCache();
+            lastStateString = JSON.stringify(state);
         }
     } catch (e) {
         console.error("Error reading localStorage, using blank state", e);
@@ -121,7 +128,7 @@ function loadData() {
     }
 }
 
-function saveAllToStorage() {
+function saveLocalCache() {
     localStorage.setItem(STORAGE_KEYS.KIDS, JSON.stringify(state.kids));
     localStorage.setItem(STORAGE_KEYS.CHORES, JSON.stringify(state.chores));
     localStorage.setItem(STORAGE_KEYS.ACTIVE_CHORES, JSON.stringify(state.activeChores));
@@ -129,6 +136,74 @@ function saveAllToStorage() {
     localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(state.events));
     localStorage.setItem(STORAGE_KEYS.PARENT_PIN, state.parentPin);
     localStorage.setItem(STORAGE_KEYS.LAST_RESET, state.lastResetDate);
+}
+
+// Background sync loop for multi-device support
+async function syncWithServer() {
+    try {
+        const response = await fetch('/api/state');
+        if (!response.ok) throw new Error("Server error fetching state");
+        
+        const serverState = await response.json();
+        
+        // If server state is empty/new, populate it with our local state (initial upload)
+        if (!serverState || !serverState.kids || serverState.kids.length === 0) {
+            console.log("Server state is empty. Uploading local state to seed it.");
+            await saveAllToStorage();
+            return;
+        }
+        
+        const serverStateStr = JSON.stringify(serverState);
+        
+        // If server state differs from our local copy, overwrite and re-render
+        if (serverStateStr !== lastStateString) {
+            console.log("Server state updated. Merging changes to local UI.");
+            state = serverState;
+            lastStateString = serverStateStr;
+            
+            saveLocalCache();
+            renderDashboard();
+            renderSidebarEventsList();
+            
+            // Refresh settings view if open
+            const settingsModal = document.getElementById('settings-modal');
+            if (settingsModal && !settingsModal.classList.contains('hidden')) {
+                const activeTab = document.querySelector('.tab-btn.active');
+                if (activeTab) {
+                    const tabId = activeTab.id.replace('tab-', '');
+                    switchTab(tabId);
+                }
+            }
+        }
+    } catch (err) {
+        console.warn("Failed server state sync, using offline cache.", err);
+    }
+}
+
+function startServerSyncPolling() {
+    // Sync immediately on load, then poll every 5 seconds
+    syncWithServer();
+    setInterval(syncWithServer, 5000);
+}
+
+async function saveAllToStorage() {
+    saveLocalCache();
+    
+    // Optimistic background save to Express API
+    try {
+        const currentStateStr = JSON.stringify(state);
+        lastStateString = currentStateStr;
+        
+        await fetch('/api/state', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: currentStateStr
+        });
+    } catch (err) {
+        console.error("Failed to push state update to server:", err);
+    }
 }
 
 // --- Date / Time Utilities ---
