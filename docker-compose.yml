@@ -5,7 +5,5 @@ services:
     ports:
       - "8080:80"
     volumes:
-      # Mount the current directory. This lets you edit index.html, styles.css, 
-      # or app.js and see changes instantly without rebuilding the container.
-      - .:/usr/share/nginx/html
+      - ./data:/app/data
     restart: unless-stopped

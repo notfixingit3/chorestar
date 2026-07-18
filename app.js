@@ -2,7 +2,7 @@
    FAMILY CHORE DASHBOARD - LOGIC
    ========================================== */
 
-const APP_VERSION = 'v0.0.1-beta.3';
+const APP_VERSION = '0.0.1-beta.4';
 
 // --- Constants & State ---
 const STORAGE_KEYS = {
@@ -11,8 +11,7 @@ const STORAGE_KEYS = {
     ACTIVE_CHORES: 'chorestar_active_chores',
     REWARDS: 'chorestar_rewards',
     LAST_RESET: 'chorestar_last_reset',
-    EVENTS: 'chorestar_events',
-    PARENT_PIN: 'chorestar_parent_pin'
+    EVENTS: 'chorestar_events'
 };
 
 let state = {
@@ -21,9 +20,13 @@ let state = {
     activeChores: [],
     rewards: [],
     events: [],
-    parentPin: '',
     lastResetDate: ''
 };
+
+let stateRevision = 0;
+let pinEnabled = false;
+let selectedMemberId = '';
+let toastTimer = null;
 
 // Helper for dynamic seeding of calendar dates
 function getRelativeDateString(offsetDays) {
@@ -35,10 +38,10 @@ function getRelativeDateString(offsetDays) {
 // --- Initial Demo Data Seed ---
 const DEMO_DATA = {
     kids: [
-        { id: 'kid-one', name: 'Kid 1', color: '#ec4899', points: 0, role: 'kid', avatar: '🦄' },
-        { id: 'kid-two', name: 'Kid 2', color: '#3b82f6', points: 0, role: 'kid', avatar: '🎮' },
-        { id: 'parent-one', name: 'Parent 1', color: '#6366f1', points: 0, role: 'parent', avatar: '👨' },
-        { id: 'parent-two', name: 'Parent 2', color: '#f97316', points: 0, role: 'parent', avatar: '👩' }
+        { id: 'kid-one', name: 'Kid 1', color: '#e84d8a', points: 0, role: 'kid', avatar: 'S' },
+        { id: 'kid-two', name: 'Kid 2', color: '#4f7cff', points: 0, role: 'kid', avatar: 'A' },
+        { id: 'parent-one', name: 'Parent 1', color: '#f0bd3d', points: 0, role: 'parent', avatar: 'T' },
+        { id: 'parent-two', name: 'Parent 2', color: '#3fa675', points: 0, role: 'parent', avatar: 'J' }
     ],
     chores: [
         { id: 'chore-1', title: 'Make your bed', points: 5, frequency: 'daily', kidId: 'all' },
@@ -47,6 +50,7 @@ const DEMO_DATA = {
         { id: 'chore-4', title: 'Put out trash bins', points: 15, frequency: 'days', daysOfWeek: ['Tue', 'Fri'], kidId: 'all' },
         { id: 'chore-5', title: 'Clean bedroom', points: 25, frequency: 'weekly', kidId: 'all' }
     ],
+    activeChores: [],
     rewards: [
         { id: 'reward-1', title: '30 min Screen Time', cost: 30 },
         { id: 'reward-2', title: 'Ice Cream Sundae', cost: 50 },
@@ -58,12 +62,11 @@ const DEMO_DATA = {
         { id: 'event-2', title: 'Kid 2: Dentist Appointment', date: getRelativeDateString(1), time: '10:00 AM', color: '#3b82f6' },
         { id: 'event-3', title: 'Family Movie Night 🍿', date: getRelativeDateString(2), time: '7:00 PM', color: '#10b981' }
     ],
-    parentPin: '',
     lastResetDate: ''
 };
 
 // --- App Initialization ---
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     loadLocalCache();
     initClock();
     checkDailyReset();
@@ -71,9 +74,10 @@ document.addEventListener('DOMContentLoaded', () => {
     renderSidebarEventsList();
     initEventListeners();
     initWakeLock();
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
+    document.getElementById('app-version').innerText = `Beta 4 · ${APP_VERSION}`;
     
-    // Start background syncing with the Node server for multi-device support
+    await syncWithServer();
     startServerSyncPolling();
 });
 
@@ -88,7 +92,6 @@ function loadLocalCache() {
         const storedRewards = localStorage.getItem(STORAGE_KEYS.REWARDS);
         const storedReset = localStorage.getItem(STORAGE_KEYS.LAST_RESET);
         const storedEvents = localStorage.getItem(STORAGE_KEYS.EVENTS);
-        const storedPin = localStorage.getItem(STORAGE_KEYS.PARENT_PIN);
 
         if (storedKids && storedChores) {
             state.kids = JSON.parse(storedKids);
@@ -112,19 +115,17 @@ function loadLocalCache() {
             } else {
                 state.events = parsedEvents;
             }
-            state.parentPin = storedPin || '';
             state.lastResetDate = storedReset || '';
             lastStateString = JSON.stringify(state);
         } else {
-            // Seed with Demo Data first time
-            state = { ...DEMO_DATA };
+            state = JSON.parse(JSON.stringify(DEMO_DATA));
             state.lastResetDate = getTodayString();
             saveLocalCache();
             lastStateString = JSON.stringify(state);
         }
     } catch (e) {
         console.error("Error reading localStorage, using blank state", e);
-        state = { kids: [], chores: [], activeChores: [], rewards: [], events: [], parentPin: '', lastResetDate: getTodayString() };
+        state = { kids: [], chores: [], activeChores: [], rewards: [], events: [], lastResetDate: getTodayString() };
     }
 }
 
@@ -134,38 +135,32 @@ function saveLocalCache() {
     localStorage.setItem(STORAGE_KEYS.ACTIVE_CHORES, JSON.stringify(state.activeChores));
     localStorage.setItem(STORAGE_KEYS.REWARDS, JSON.stringify(state.rewards));
     localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(state.events));
-    localStorage.setItem(STORAGE_KEYS.PARENT_PIN, state.parentPin);
     localStorage.setItem(STORAGE_KEYS.LAST_RESET, state.lastResetDate);
 }
 
-// Background sync loop for multi-device support
+function applyServerEnvelope(envelope, rerender = true) {
+    if (!envelope || !envelope.state) return;
+    state = envelope.state;
+    stateRevision = Number(envelope.revision) || 0;
+    pinEnabled = Boolean(envelope.pinEnabled);
+    if (envelope.version) document.getElementById('app-version').innerText = `Beta 4 · ${envelope.version}`;
+    lastStateString = JSON.stringify(state);
+    saveLocalCache();
+    setSyncStatus(true);
+    if (rerender) {
+        renderDashboard();
+        renderSidebarEventsList();
+    }
+}
+
 async function syncWithServer() {
     try {
-        const response = await fetch('/api/state');
+        const response = await fetch('/api/state', { cache: 'no-store' });
         if (!response.ok) throw new Error("Server error fetching state");
-        
-        const serverState = await response.json();
-        
-        // If server state is empty/new, populate it with our local state (initial upload)
-        if (!serverState || !serverState.kids || serverState.kids.length === 0) {
-            console.log("Server state is empty. Uploading local state to seed it.");
-            await saveAllToStorage();
-            return;
-        }
-        
-        const serverStateStr = JSON.stringify(serverState);
-        
-        // If server state differs from our local copy, overwrite and re-render
-        if (serverStateStr !== lastStateString) {
-            console.log("Server state updated. Merging changes to local UI.");
-            state = serverState;
-            lastStateString = serverStateStr;
+        const envelope = await response.json();
+        if (envelope.revision !== stateRevision || JSON.stringify(envelope.state) !== lastStateString) {
+            applyServerEnvelope(envelope);
             
-            saveLocalCache();
-            renderDashboard();
-            renderSidebarEventsList();
-            
-            // Refresh settings view if open
             const settingsModal = document.getElementById('settings-modal');
             if (settingsModal && !settingsModal.classList.contains('hidden')) {
                 const activeTab = document.querySelector('.tab-btn.active');
@@ -174,36 +169,76 @@ async function syncWithServer() {
                     switchTab(tabId);
                 }
             }
-        }
+        } else setSyncStatus(true);
     } catch (err) {
         console.warn("Failed server state sync, using offline cache.", err);
+        setSyncStatus(false);
     }
 }
 
 function startServerSyncPolling() {
-    // Sync immediately on load, then poll every 5 seconds
-    syncWithServer();
     setInterval(syncWithServer, 5000);
 }
 
 async function saveAllToStorage() {
     saveLocalCache();
-    
-    // Optimistic background save to Express API
     try {
-        const currentStateStr = JSON.stringify(state);
-        lastStateString = currentStateStr;
-        
-        await fetch('/api/state', {
-            method: 'POST',
+        const response = await fetch('/api/admin/state', {
+            method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: currentStateStr
+            body: JSON.stringify({ revision: stateRevision, state })
         });
+        const envelope = await response.json();
+        if (response.status === 401) {
+            showToast('Parent access expired. Unlock Manage to save changes.', true);
+            document.getElementById('settings-modal').classList.add('hidden');
+            openPinModal();
+            return false;
+        }
+        if (response.status === 409) {
+            applyServerEnvelope(envelope);
+            showToast('Another device changed the board. Latest household state restored.', true);
+            return false;
+        }
+        if (!response.ok) throw new Error(envelope.error || 'Save failed');
+        applyServerEnvelope(envelope, false);
+        setSyncStatus(true);
+        return true;
     } catch (err) {
         console.error("Failed to push state update to server:", err);
+        setSyncStatus(false);
+        showToast('Changes are cached here and will need to be saved when the server returns.', true);
+        return false;
     }
+}
+
+function setSyncStatus(isOnline) {
+    const label = document.getElementById('sync-status');
+    const dot = document.querySelector('.status-dot');
+    if (label) label.innerText = isOnline ? 'Synced to this household' : 'Offline · using this device';
+    if (dot) dot.classList.toggle('offline', !isOnline);
+}
+
+function showToast(message, isError = false) {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    window.clearTimeout(toastTimer);
+    toast.innerText = message;
+    toast.classList.toggle('error', isError);
+    toast.classList.remove('hidden');
+    toastTimer = window.setTimeout(() => toast.classList.add('hidden'), 4000);
+}
+
+function escapeHTML(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    })[character]);
+}
+
+function safeColor(value) {
+    return /^#[0-9a-f]{6}$/i.test(value) ? value : '#4f7cff';
 }
 
 // --- Date / Time Utilities ---
@@ -318,7 +353,22 @@ function initializeActiveChores(dateStr) {
         }
     });
 
-    saveAllToStorage();
+    saveLocalCache();
+}
+
+function rebuildActiveChoresForToday() {
+    const previous = new Map(state.activeChores.map(active => [`${active.kidId}:${active.choreId}`, active]));
+    state.activeChores = [];
+    initializeActiveChores(getTodayString());
+    state.activeChores.forEach(active => {
+        const oldActive = previous.get(`${active.kidId}:${active.choreId}`);
+        if (!oldActive?.completed) return;
+        active.completed = true;
+        const member = state.kids.find(kid => kid.id === active.kidId);
+        if (member && member.role !== 'parent' && active.points !== oldActive.points) {
+            member.points = Math.max(0, member.points + active.points - oldActive.points);
+        }
+    });
 }
 
 // --- Custom Dialog Modal Helper ---
@@ -364,6 +414,9 @@ function renderDashboard() {
     let totalChoresCount = 0;
     let totalCompletedCount = 0;
     
+    if (!state.kids.some(kid => kid.id === selectedMemberId)) selectedMemberId = state.kids[0].id;
+    renderMemberSwitcher();
+
     state.kids.forEach(kid => {
         // Ensure role exists
         const role = kid.role || 'kid';
@@ -384,8 +437,9 @@ function renderDashboard() {
 
         // Create kid card
         const card = document.createElement('div');
-        card.className = `kid-card ${isAllDone ? 'all-done' : ''} ${role === 'parent' ? 'parent-role' : ''}`;
-        card.style.setProperty('--kid-accent-color', kid.color);
+        card.className = `kid-card ${isAllDone ? 'all-done' : ''} ${role === 'parent' ? 'parent-role' : ''} ${kid.id === selectedMemberId ? 'mobile-selected' : ''}`;
+        card.style.setProperty('--kid-accent-color', safeColor(kid.color));
+        card.dataset.memberId = kid.id;
         
         // Role sub-text/badge
         const roleLabel = role === 'parent' ? 'Parent' : 'Kid';
@@ -394,7 +448,7 @@ function renderDashboard() {
         const scoreBadgeHTML = role !== 'parent' 
             ? `
             <div class="kid-score-badge">
-                <span class="kid-score-val" id="score-val-${kid.id}">${kid.points}</span>
+                <span class="kid-score-val">${kid.points}</span>
                 <span class="kid-score-lbl">Points</span>
             </div>
             `
@@ -404,10 +458,10 @@ function renderDashboard() {
         let cardHTML = `
             <div class="kid-card-header">
                 <div class="kid-info">
-                    <div class="kid-avatar">${kid.avatar || kid.name.charAt(0).toUpperCase()}</div>
+                    <div class="kid-avatar">${escapeHTML(kid.avatar || kid.name.charAt(0).toUpperCase())}</div>
                     <div class="kid-name-container">
-                        <span class="kid-name">${kid.name} <span style="font-size:0.8rem; font-weight:500; opacity:0.6;">(${roleLabel})</span></span>
-                        <span class="kid-sub-stat">${completedChores.length}/${kidChores.length} Chores Done</span>
+                        <span class="kid-name">${escapeHTML(kid.name)}</span>
+                        <span class="kid-sub-stat"><span class="role-label">${roleLabel}</span> · ${completedChores.length}/${kidChores.length} done</span>
                     </div>
                 </div>
                 ${scoreBadgeHTML}
@@ -428,8 +482,8 @@ function renderDashboard() {
         if (isAllDone) {
             cardHTML += `
                 <div class="congrats-card">
-                    <h4><i data-lucide="trophy"></i> Awesome Job!</h4>
-                    <p>All chores completed for today! 🎉</p>
+                    <h4><i data-lucide="trophy"></i> Lineup complete</h4>
+                    <p>Everything for today is checked off.</p>
                 </div>
             `;
         }
@@ -454,20 +508,20 @@ function renderDashboard() {
                     : '';
                     
                 cardHTML += `
-                    <div class="chore-item ${chore.completed ? 'completed' : ''}" onclick="toggleChore('${chore.id}')">
+                    <button type="button" class="chore-item ${chore.completed ? 'completed' : ''}" data-chore-id="${escapeHTML(chore.id)}" aria-pressed="${chore.completed}">
                         <div class="chore-left">
                             <div class="chore-checkbox">
                                 <i data-lucide="check"></i>
                             </div>
                             <div>
-                                <div class="chore-title">${chore.title}</div>
+                                <div class="chore-title">${escapeHTML(chore.title)}</div>
                                 <div class="chore-badge-row">
-                                    <span class="chore-frequency-badge">${frequencyText}</span>
+                                    <span class="chore-frequency-badge">${escapeHTML(frequencyText)}</span>
                                 </div>
                             </div>
                         </div>
                         ${pointsIndicatorHTML}
-                    </div>
+                    </button>
                 `;
             });
         }
@@ -483,14 +537,14 @@ function renderDashboard() {
             state.rewards.forEach(reward => {
                 const canAfford = kid.points >= reward.cost;
                 cardHTML += `
-                    <div class="reward-claim-card ${!canAfford ? 'disabled' : ''}" 
-                         onclick="${canAfford ? `claimReward('${kid.id}', '${reward.id}')` : ''}">
-                        <div class="reward-claim-title">${reward.title}</div>
+                    <button type="button" class="reward-claim-card ${!canAfford ? 'disabled' : ''}"
+                         data-kid-id="${escapeHTML(kid.id)}" data-reward-id="${escapeHTML(reward.id)}" ${canAfford ? '' : 'disabled'}>
+                        <div class="reward-claim-title">${escapeHTML(reward.title)}</div>
                         <div class="reward-claim-footer">
                             <span class="reward-cost-tag">${reward.cost} pts</span>
                             <span class="claim-indicator">${canAfford ? 'Claim' : 'Locked'}</span>
                         </div>
-                    </div>
+                    </button>
                 `;
             });
             
@@ -498,6 +552,12 @@ function renderDashboard() {
         }
         
         card.innerHTML = cardHTML;
+        card.querySelectorAll('[data-chore-id]').forEach(button => {
+            button.addEventListener('click', () => toggleChore(button.dataset.choreId));
+        });
+        card.querySelectorAll('[data-reward-id]').forEach(button => {
+            button.addEventListener('click', () => claimReward(button.dataset.kidId, button.dataset.rewardId));
+        });
         kidsGrid.appendChild(card);
     });
     
@@ -505,8 +565,31 @@ function renderDashboard() {
     updateFamilyProgressCircle(totalCompletedCount, totalChoresCount);
     
     // Refresh icons
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
+
+function renderMemberSwitcher() {
+    const switcher = document.getElementById('member-switcher');
+    if (!switcher) return;
+    switcher.innerHTML = '';
+    state.kids.forEach(kid => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.innerText = kid.name;
+        button.classList.toggle('active', kid.id === selectedMemberId);
+        button.style.setProperty('--member-color', safeColor(kid.color));
+        button.addEventListener('click', () => selectMember(kid.id));
+        switcher.appendChild(button);
+    });
+}
+
+window.selectMember = function(memberId) {
+    selectedMemberId = memberId;
+    document.querySelectorAll('.kid-card').forEach(card => {
+        card.classList.toggle('mobile-selected', card.dataset.memberId === memberId);
+    });
+    renderMemberSwitcher();
+};
 
 function updateFamilyProgressCircle(completed, total) {
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -527,58 +610,45 @@ function updateFamilyProgressCircle(completed, total) {
 }
 
 // --- Interaction Logics ---
-window.toggleChore = function(activeChoreId) {
-    const choreIndex = state.activeChoreInstancesIndex = state.activeChores.findIndex(c => c.id === activeChoreId);
-    if (choreIndex === -1) return;
-    
-    const activeChore = state.activeChores[choreIndex];
-    activeChore.completed = !activeChore.completed;
-    
-    // Adjust kid points (Kids only)
-    const kidIndex = state.kids.findIndex(k => k.id === activeChore.kidId);
-    if (kidIndex !== -1) {
-        const kid = state.kids[kidIndex];
-        if (kid.role !== 'parent') {
-            const pointsDiff = activeChore.completed ? activeChore.points : -activeChore.points;
-            kid.points = Math.max(0, kid.points + pointsDiff);
-        }
-    }
-    
-    saveAllToStorage();
-    
-    // Fun particles
-    if (activeChore.completed) {
-        // Small confetti pop
-        confetti({
-            particleCount: 40,
-            spread: 50,
-            origin: { y: 0.75 }
+window.toggleChore = async function(activeChoreId) {
+    const previous = state.activeChores.find(chore => chore.id === activeChoreId);
+    if (!previous) return;
+    try {
+        const response = await fetch('/api/actions/toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ activeChoreId })
         });
-        
-        // Check if this makes the kid completely done with all their chores
-        const kidChores = state.activeChores.filter(ac => ac.kidId === activeChore.kidId);
-        const kidDone = kidChores.every(ac => ac.completed);
-        if (kidDone) {
-            // Trigger massive celebration after a tiny delay for visual flow
-            setTimeout(celebrateKidCompletion, 300);
+        const envelope = await response.json();
+        if (!response.ok) throw new Error(envelope.error || 'Chore could not be updated');
+        applyServerEnvelope(envelope);
+        const updated = state.activeChores.find(chore => chore.id === activeChoreId);
+        if (updated?.completed && !previous.completed) {
+            celebrate({ particleCount: 28, spread: 46, origin: { y: 0.72 } });
+            const memberChores = state.activeChores.filter(chore => chore.kidId === updated.kidId);
+            if (memberChores.length && memberChores.every(chore => chore.completed)) {
+                window.setTimeout(celebrateKidCompletion, 250);
+            }
         }
+    } catch (error) {
+        setSyncStatus(false);
+        showToast(error.message, true);
     }
-    
-    renderDashboard();
 }
 
 function celebrateKidCompletion() {
+    if (!canCelebrate()) return;
     const duration = 2.5 * 1000;
     const end = Date.now() + duration;
     
     (function frame() {
-        confetti({
+        window.confetti({
             particleCount: 5,
             angle: 60,
             spread: 55,
             origin: { x: 0 }
         });
-        confetti({
+        window.confetti({
             particleCount: 5,
             angle: 120,
             spread: 55,
@@ -591,6 +661,14 @@ function celebrateKidCompletion() {
     }());
 }
 
+function canCelebrate() {
+    return Boolean(window.confetti) && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function celebrate(options) {
+    if (canCelebrate()) window.confetti(options);
+}
+
 window.claimReward = async function(kidId, rewardId) {
     const kid = state.kids.find(k => k.id === kidId);
     const reward = state.rewards.find(r => r.id === rewardId);
@@ -601,19 +679,25 @@ window.claimReward = async function(kidId, rewardId) {
     const confirmed = await showConfirm("Claim Reward?", confirmText);
     
     if (confirmed) {
-        // Deduct points
-        kid.points -= reward.cost;
-        saveAllToStorage();
-        
-        // Explode purple reward confetti!
-        confetti({
-            particleCount: 80,
-            spread: 80,
-            colors: ['#a855f7', '#d8b4fe', '#f3e8ff'],
-            origin: { y: 0.6 }
-        });
-        
-        renderDashboard();
+        try {
+            const response = await fetch('/api/actions/claim', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kidId, rewardId })
+            });
+            const envelope = await response.json();
+            if (!response.ok) throw new Error(envelope.error || 'Reward could not be claimed');
+            applyServerEnvelope(envelope);
+            celebrate({
+                particleCount: 64,
+                spread: 76,
+                colors: ['#f0bd3d', '#e84d63', '#4f7cff', '#3fa675'],
+                origin: { y: 0.62 }
+            });
+            showToast(`${kid.name} claimed ${reward.title}.`);
+        } catch (error) {
+            showToast(error.message, true);
+        }
     }
 }
 
@@ -702,8 +786,8 @@ window.saveKid = function(event) {
         });
     }
     
+    initializeActiveChores(getTodayString());
     saveAllToStorage();
-    checkDailyReset(); // update chores instances for new kids
     hideKidForm();
     renderSettingsKidsList();
     renderDashboard();
@@ -727,22 +811,22 @@ function renderSettingsKidsList() {
         item.className = 'settings-list-item';
         item.innerHTML = `
             <div class="settings-list-item-info">
-                <div class="kid-avatar" style="background-color: ${kid.color}; width: 40px; height: 40px; font-size: 1.1rem;">
-                    ${kid.avatar || kid.name.charAt(0).toUpperCase()}
+                <div class="kid-avatar" style="background-color: ${safeColor(kid.color)}; width: 40px; height: 40px; font-size: 1.1rem;">
+                    ${escapeHTML(kid.avatar || kid.name.charAt(0).toUpperCase())}
                 </div>
                 <div>
-                    <strong>${kid.name} <span style="font-size:0.75rem; opacity:0.6; font-weight:normal;">(${roleLabel})</span></strong>
+                    <strong>${escapeHTML(kid.name)} <span style="font-size:0.75rem; opacity:0.6; font-weight:normal;">(${roleLabel})</span></strong>
                     <div style="font-size:0.8rem; color:var(--text-muted);">${ptsText}</div>
                 </div>
             </div>
             <div class="settings-item-actions">
-                <button onclick="editKid('${kid.id}')" class="icon-only-btn edit"><i data-lucide="edit-3"></i></button>
-                <button onclick="deleteKid('${kid.id}')" class="icon-only-btn delete"><i data-lucide="trash-2"></i></button>
+                <button type="button" aria-label="Edit ${escapeHTML(kid.name)}" data-action="edit-kid" data-id="${kid.id}" class="icon-only-btn edit"><i data-lucide="edit-3"></i></button>
+                <button type="button" aria-label="Delete ${escapeHTML(kid.name)}" data-action="delete-kid" data-id="${kid.id}" class="icon-only-btn delete"><i data-lucide="trash-2"></i></button>
             </div>
         `;
         container.appendChild(item);
     });
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 window.editKid = function(id) {
@@ -813,10 +897,16 @@ window.hideChoreForm = function() {
 
 function populateChoreKidSelect() {
     const select = document.getElementById('chore-kid');
-    select.innerHTML = '<option value="all">Everyone (Creates chore for each member)</option>';
-    
+    select.replaceChildren();
+    const everyoneOption = document.createElement('option');
+    everyoneOption.value = 'all';
+    everyoneOption.innerText = 'Everyone (creates one chore per member)';
+    select.appendChild(everyoneOption);
     state.kids.forEach(kid => {
-        select.innerHTML += `<option value="${kid.id}">${kid.name}</option>`;
+        const option = document.createElement('option');
+        option.value = kid.id;
+        option.innerText = kid.name;
+        select.appendChild(option);
     });
 }
 
@@ -883,10 +973,8 @@ window.saveChore = function(event) {
         });
     }
     
+    rebuildActiveChoresForToday();
     saveAllToStorage();
-    // Regenerate active chores to match new templates
-    state.activeChores = []; // Clear and re-init active chores for a fresh sync
-    initializeActiveChores(getTodayString());
     
     hideChoreForm();
     renderSettingsChoresList();
@@ -922,22 +1010,22 @@ function renderSettingsChoresList() {
         item.innerHTML = `
             <div class="settings-list-item-info">
                 <div>
-                    <strong>${chore.title}</strong>
+                    <strong>${escapeHTML(chore.title)}</strong>
                     <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.15rem;">
                         <span style="color:var(--color-primary); font-weight:700;">+${chore.points} pts</span>
-                        &bull; ${freqLabel}
-                        &bull; Assigned to: <strong>${assignedName}</strong>
+                        &bull; ${escapeHTML(freqLabel)}
+                        &bull; Assigned to: <strong>${escapeHTML(assignedName)}</strong>
                     </div>
                 </div>
             </div>
             <div class="settings-item-actions">
-                <button onclick="editChore('${chore.id}')" class="icon-only-btn edit"><i data-lucide="edit-3"></i></button>
-                <button onclick="deleteChore('${chore.id}')" class="icon-only-btn delete"><i data-lucide="trash-2"></i></button>
+                <button type="button" aria-label="Edit ${escapeHTML(chore.title)}" data-action="edit-chore" data-id="${chore.id}" class="icon-only-btn edit"><i data-lucide="edit-3"></i></button>
+                <button type="button" aria-label="Delete ${escapeHTML(chore.title)}" data-action="delete-chore" data-id="${chore.id}" class="icon-only-btn delete"><i data-lucide="trash-2"></i></button>
             </div>
         `;
         container.appendChild(item);
     });
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 window.editChore = function(id) {
@@ -974,6 +1062,10 @@ window.deleteChore = async function(id) {
     
     const confirmed = await showConfirm("Delete Chore?", `Delete "${chore.title}" chore template? Today's instances will also be deleted.`);
     if (confirmed) {
+        state.activeChores.filter(active => active.choreId === id && active.completed).forEach(active => {
+            const member = state.kids.find(kid => kid.id === active.kidId);
+            if (member && member.role !== 'parent') member.points = Math.max(0, member.points - active.points);
+        });
         state.chores = state.chores.filter(c => c.id !== id);
         state.activeChores = state.activeChores.filter(ac => ac.choreId !== id);
         
@@ -1018,17 +1110,17 @@ function renderSettingsRewardsList() {
         item.innerHTML = `
             <div class="settings-list-item-info">
                 <div>
-                    <strong>${reward.title}</strong>
+                    <strong>${escapeHTML(reward.title)}</strong>
                     <div style="font-size:0.8rem; color:var(--color-accent); font-weight:700;">Cost: ${reward.cost} pts</div>
                 </div>
             </div>
             <div class="settings-item-actions">
-                <button onclick="deleteReward('${reward.id}')" class="icon-only-btn delete"><i data-lucide="trash-2"></i></button>
+                <button type="button" aria-label="Delete ${escapeHTML(reward.title)}" data-action="delete-reward" data-id="${reward.id}" class="icon-only-btn delete"><i data-lucide="trash-2"></i></button>
             </div>
         `;
         container.appendChild(item);
     });
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 window.deleteReward = async function(id) {
@@ -1058,9 +1150,14 @@ window.resetAllPointsConfirm = async function() {
 };
 
 window.resetAllChoresConfirm = async function() {
-    const confirmed = await showConfirm("Reset Today's Chores?", "Reset all today's chores to 'incomplete'? Completed chores points won't be refunded (they keep their current points).");
+    const confirmed = await showConfirm("Reset Today's Chores?", "Reset today's chores and refund the points earned from completed items?");
     if (confirmed) {
-        state.activeChores.forEach(ac => ac.completed = false);
+        state.activeChores.forEach(active => {
+            if (!active.completed) return;
+            const member = state.kids.find(kid => kid.id === active.kidId);
+            if (member && member.role !== 'parent') member.points = Math.max(0, member.points - active.points);
+            active.completed = false;
+        });
         saveAllToStorage();
         renderDashboard();
     }
@@ -1084,7 +1181,7 @@ async function initWakeLock() {
         if (btn) {
             btn.style.opacity = '0.5';
             btn.title = "Screen Wake Lock not supported by this browser";
-            btn.querySelector('span').innerText = "Screen On (Unsupported)";
+            btn.querySelector('span').innerText = "Unavailable";
         }
     }
 }
@@ -1121,18 +1218,18 @@ function updateWakeLockUI(isActive) {
     if (!btn) return;
     
     const textSpan = btn.querySelector('span');
-    const icon = btn.querySelector('i');
+    const icon = btn.querySelector('[data-lucide]');
     
     if (isActive) {
         btn.classList.add('active-glow');
-        textSpan.innerText = "Screen stays ON";
+        textSpan.innerText = "Screen on";
         if (icon) icon.setAttribute('data-lucide', 'sun-dim');
     } else {
         btn.classList.remove('active-glow');
-        textSpan.innerText = "Keep Screen On";
+        textSpan.innerText = "Screen";
         if (icon) icon.setAttribute('data-lucide', 'sun');
     }
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 function toggleWakeLock() {
@@ -1154,16 +1251,9 @@ function initEventListeners() {
     const settingsModal = document.getElementById('settings-modal');
     const btnSetupFirst = document.getElementById('btn-setup-first');
     const btnWakeLock = document.getElementById('btn-wake-lock');
+    const btnSettingsMobile = document.getElementById('btn-settings-mobile');
     
-    const openSettings = () => {
-        if (state.parentPin) {
-            openPinModal();
-        } else {
-            settingsModal.classList.remove('hidden');
-            populateChoreKidSelect();
-            switchTab('kids');
-        }
-    };
+    const openSettings = () => openSettingsForTab('kids');
     
     const closeSettings = () => {
         settingsModal.classList.add('hidden');
@@ -1173,6 +1263,44 @@ function initEventListeners() {
     if (btnCloseModal) btnCloseModal.addEventListener('click', closeSettings);
     if (btnSetupFirst) btnSetupFirst.addEventListener('click', openSettings);
     if (btnWakeLock) btnWakeLock.addEventListener('click', toggleWakeLock);
+    if (btnSettingsMobile) btnSettingsMobile.addEventListener('click', openSettings);
+
+    document.getElementById('kid-form')?.addEventListener('submit', saveKid);
+    document.getElementById('chore-form')?.addEventListener('submit', saveChore);
+    document.getElementById('event-form')?.addEventListener('submit', saveEvent);
+    document.getElementById('reward-form')?.addEventListener('submit', saveReward);
+    document.getElementById('chore-frequency')?.addEventListener('change', handleChoreFrequencyChange);
+
+    document.addEventListener('click', event => {
+        const trigger = event.target.closest('[data-action]');
+        if (!trigger) return;
+        const action = trigger.dataset.action;
+        const id = trigger.dataset.id;
+        const actions = {
+            'open-calendar': () => openCalendarSettings(),
+            'scroll-panel': () => scrollToPanel(trigger.dataset.panel),
+            'switch-tab': () => switchTab(trigger.dataset.tab),
+            'show-add-kid': () => showAddKidForm(),
+            'hide-kid-form': () => hideKidForm(),
+            'show-add-chore': () => showAddChoreForm(),
+            'hide-chore-form': () => hideChoreForm(),
+            'reset-points': () => resetAllPointsConfirm(),
+            'reset-chores': () => resetAllChoresConfirm(),
+            'save-pin': () => saveParentPin(),
+            'disable-pin': () => disableParentPin(),
+            'pin-key': () => pressPinKey(trigger.dataset.key),
+            'clear-pin': () => clearPin(),
+            'backspace-pin': () => backspacePin(),
+            'close-pin': () => closePinModal(),
+            'edit-kid': () => editKid(id),
+            'delete-kid': () => deleteKid(id),
+            'edit-chore': () => editChore(id),
+            'delete-chore': () => deleteChore(id),
+            'delete-reward': () => deleteReward(id),
+            'delete-event': () => deleteEvent(id)
+        };
+        actions[action]?.();
+    });
     
     // Close modal on clicking backdrop
     settingsModal.addEventListener('click', (e) => {
@@ -1191,6 +1319,29 @@ function initEventListeners() {
         });
     }
 }
+
+async function openSettingsForTab(tabName = 'kids') {
+    if (pinEnabled) {
+        try {
+            const response = await fetch('/api/admin/session', { cache: 'no-store' });
+            const session = await response.json();
+            if (!session.unlocked) {
+                openPinModal(tabName);
+                return;
+            }
+        } catch (error) {
+            showToast('The household server is unavailable.', true);
+            return;
+        }
+    }
+    document.getElementById('settings-modal').classList.remove('hidden');
+    populateChoreKidSelect();
+    switchTab(tabName);
+}
+
+window.scrollToPanel = function(panelId) {
+    document.getElementById(panelId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
 
 // ==========================================
 // FAMILY CALENDAR & AGENDA WIDGET
@@ -1247,10 +1398,10 @@ function renderSidebarEventsList() {
         const item = document.createElement('div');
         item.className = 'sidebar-event-item';
         item.innerHTML = `
-            <div class="sidebar-event-dot" style="background-color: ${ev.color || '#3b82f6'};"></div>
+            <div class="sidebar-event-dot" style="background-color: ${safeColor(ev.color)};"></div>
             <div class="sidebar-event-details">
-                <span class="sidebar-event-title">${ev.title}</span>
-                <span class="sidebar-event-time">${timeLabel}</span>
+                <span class="sidebar-event-title">${escapeHTML(ev.title)}</span>
+                <span class="sidebar-event-time">${escapeHTML(timeLabel)}</span>
             </div>
         `;
         container.appendChild(item);
@@ -1275,21 +1426,21 @@ function renderSettingsEventsList() {
         item.className = 'settings-list-item';
         item.innerHTML = `
             <div class="settings-list-item-info">
-                <div class="sidebar-event-dot" style="background-color: ${ev.color || '#3b82f6'}; width:12px; height:12px;"></div>
+                <div class="sidebar-event-dot" style="background-color: ${safeColor(ev.color)}; width:12px; height:12px;"></div>
                 <div>
-                    <strong>${ev.title}</strong>
+                    <strong>${escapeHTML(ev.title)}</strong>
                     <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.15rem;">
-                        ${ev.date} ${ev.time ? `&bull; ${ev.time}` : ''}
+                        ${escapeHTML(ev.date)} ${ev.time ? `&bull; ${escapeHTML(ev.time)}` : ''}
                     </div>
                 </div>
             </div>
             <div class="settings-item-actions">
-                <button onclick="deleteEvent('${ev.id}')" class="icon-only-btn delete"><i data-lucide="trash-2"></i></button>
+                <button type="button" aria-label="Delete ${escapeHTML(ev.title)}" data-action="delete-event" data-id="${ev.id}" class="icon-only-btn delete"><i data-lucide="trash-2"></i></button>
             </div>
         `;
         container.appendChild(item);
     });
-    lucide.createIcons();
+    if (window.lucide) lucide.createIcons();
 }
 
 window.saveEvent = function(event) {
@@ -1337,27 +1488,47 @@ window.deleteEvent = async function(id) {
 
 let pinBuffer = '';
 
-window.saveParentPin = function() {
+window.saveParentPin = async function() {
     const pinInput = document.getElementById('parent-pin-input');
     const pin = pinInput.value.trim();
     
     if (pin.length !== 4 || isNaN(pin)) {
-        alert("Please enter a valid 4-digit numeric PIN.");
+        showToast('Enter exactly four digits.', true);
         return;
     }
-    
-    state.parentPin = pin;
-    saveAllToStorage();
-    updatePinSecurityUI();
-    alert("Parent Security PIN has been set successfully!");
+
+    try {
+        const response = await fetch('/api/admin/pin', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'PIN could not be saved');
+        pinEnabled = true;
+        if (result.state) applyServerEnvelope(result, false);
+        updatePinSecurityUI();
+        document.getElementById('settings-modal').classList.add('hidden');
+        showToast('Parent PIN enabled. Unlock Manage to make changes.');
+    } catch (error) {
+        showToast(error.message, true);
+    }
 };
 
 window.disableParentPin = async function() {
     const confirmed = await showConfirm("Disable Security PIN?", "Are you sure you want to disable the Settings lock? Anyone will be able to edit chores and points.");
     if (confirmed) {
-        state.parentPin = '';
-        saveAllToStorage();
-        updatePinSecurityUI();
+        try {
+            const response = await fetch('/api/admin/pin', { method: 'DELETE' });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'PIN could not be disabled');
+            pinEnabled = false;
+            if (result.state) applyServerEnvelope(result, false);
+            updatePinSecurityUI();
+            showToast('Parent PIN disabled.');
+        } catch (error) {
+            showToast(error.message, true);
+        }
     }
 };
 
@@ -1367,8 +1538,8 @@ function updatePinSecurityUI() {
     const btnDisable = document.getElementById('btn-disable-pin');
     if (!pinInput || !btnSave || !btnDisable) return;
     
-    if (state.parentPin) {
-        pinInput.value = '••••';
+    if (pinEnabled) {
+        pinInput.value = '0000';
         pinInput.disabled = true;
         btnSave.classList.add('hidden');
         btnDisable.classList.remove('hidden');
@@ -1403,26 +1574,31 @@ window.pressPinKey = function(num) {
     
     if (pinBuffer.length === 4) {
         // Wait 200ms to let the last dot fill visually
-        setTimeout(() => {
-            if (pinBuffer === state.parentPin) {
+        setTimeout(async () => {
+            try {
+                const response = await fetch('/api/admin/unlock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin: pinBuffer })
+                });
+                if (response.ok) {
                 closePinModal();
-                // Open Settings modal
                 document.getElementById('settings-modal').classList.remove('hidden');
                 populateChoreKidSelect();
                 switchTab(targetSettingsTab);
-            } else {
-                // Vibrate/Shake card
+                return;
+                }
+            } catch (error) {
+                showToast('The household server is unavailable.', true);
+            }
+
                 const card = document.querySelector('.pin-card');
                 if (card) {
                     card.classList.add('shake');
-                    // Clear shake class after animation completes
                     setTimeout(() => card.classList.remove('shake'), 400);
                 }
-                
-                // Clear buffer and dots
                 pinBuffer = '';
                 updatePinDotsDisplay();
-            }
         }, 200);
     }
 };
@@ -1452,14 +1628,5 @@ function updatePinDotsDisplay() {
 
 // Global click handler for family calendar widget
 window.openCalendarSettings = function() {
-    if (state.parentPin) {
-        openPinModal('calendar');
-    } else {
-        const modal = document.getElementById('settings-modal');
-        if (modal) {
-            modal.classList.remove('hidden');
-            populateChoreKidSelect();
-            switchTab('calendar');
-        }
-    }
+    openSettingsForTab('calendar');
 };

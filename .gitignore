@@ -10,3 +10,7 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Local runtime files
+node_modules/
+data/

@@ -3,129 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Family Chore Dashboard</title>
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Canvas Confetti -->
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="styles.css?v=1.0.7">
+    <meta name="theme-color" content="#11130f">
+    <title>ChoreStar Household Board</title>
+    <link rel="icon" href="/chorestar-mark.svg" type="image/svg+xml">
+    <script src="/vendor/lucide.js" defer></script>
+    <script src="/vendor/confetti.js" defer></script>
+    <link rel="stylesheet" href="styles.css?v=0.0.1-beta.4">
 </head>
 <body>
     <div class="dashboard-container">
-        <!-- Sidebar / Control Panel -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="time-widget">
-                    <div id="current-time">12:00 PM</div>
-                    <div id="current-date">Friday, July 17</div>
-                    <div class="version-badge">v0.0.1-beta.3</div>
+        <header class="topbar">
+            <div class="brand-lockup" aria-label="ChoreStar household board">
+                <img src="chorestar-mark.svg" alt="" class="brand-mark">
+                <div>
+                    <div class="brand-name">ChoreStar</div>
+                    <div class="brand-tagline">Household board</div>
                 </div>
             </div>
-            
-            <div class="family-stats-card">
-                <h3>Family Progress</h3>
+
+            <div class="time-widget">
+                <div id="current-time">12:00 PM</div>
+                <div id="current-date">Friday, July 17</div>
+            </div>
+
+            <div class="family-stats-card" aria-label="Family progress">
                 <div class="progress-circle-container">
-                    <svg class="progress-ring" width="120" height="120">
-                        <circle class="progress-ring__circle-bg" stroke="rgba(255,255,255,0.05)" stroke-width="8" fill="transparent" r="50" cx="60" cy="60"/>
-                        <circle id="family-progress-ring" class="progress-ring__circle" stroke="url(#blue-gradient)" stroke-width="8" fill="transparent" r="50" cx="60" cy="60"/>
-                        <!-- Define Gradient for SVG -->
-                        <defs>
-                            <linearGradient id="blue-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#3b82f6" />
-                                <stop offset="100%" stop-color="#8b5cf6" />
-                            </linearGradient>
-                        </defs>
+                    <svg class="progress-ring" width="64" height="64" aria-hidden="true">
+                        <circle class="progress-ring__circle-bg" stroke-width="6" fill="transparent" r="25" cx="32" cy="32"/>
+                        <circle id="family-progress-ring" class="progress-ring__circle" stroke-width="6" fill="transparent" r="25" cx="32" cy="32"/>
                     </svg>
-                    <div class="progress-ring-text">
-                        <span id="family-percentage">0%</span>
-                        <span class="label">Completed</span>
-                    </div>
+                    <div class="progress-ring-text"><span id="family-percentage">0%</span></div>
                 </div>
-                <div class="stats-row">
-                    <div class="stat-box">
-                        <span class="stat-val" id="family-done">0</span>
-                        <span class="stat-lbl">Done</span>
-                    </div>
-                    <div class="stat-box">
-                        <span class="stat-val" id="family-total">0</span>
-                        <span class="stat-lbl">Total</span>
-                    </div>
+                <div class="family-stat-copy">
+                    <span class="family-stat-title">Family progress</span>
+                    <span><strong id="family-done">0</strong> of <strong id="family-total">0</strong> done</span>
                 </div>
             </div>
 
-            <!-- Sidebar Family Calendar -->
-            <div class="family-events-card" onclick="openCalendarSettings()">
-                <h3><i data-lucide="calendar"></i> Family Schedule</h3>
-                <div id="sidebar-events-list" class="sidebar-events-list">
-                    <!-- Loaded dynamically -->
-                </div>
+            <div class="topbar-actions">
+                <button id="btn-wake-lock" class="tool-btn" title="Keep screen on" aria-label="Keep screen on">
+                    <i data-lucide="sun"></i><span>Screen</span>
+                </button>
+                <button id="btn-settings" class="tool-btn tool-btn-primary" title="Manage household" aria-label="Manage household">
+                    <i data-lucide="settings-2"></i><span>Manage</span>
+                </button>
             </div>
+        </header>
 
-            <div class="sidebar-controls">
-                <button id="btn-settings" class="icon-btn">
-                    <i data-lucide="settings"></i>
-                    <span>Manage Chores</span>
-                </button>
-                <button id="btn-wake-lock" class="icon-btn">
-                    <i data-lucide="sun"></i>
-                    <span>Keep Screen On</span>
-                </button>
+        <aside class="sidebar" id="schedule-panel">
+            <div class="rail-heading">
+                <span class="section-kicker">Coming up</span>
+                <h2>Family schedule</h2>
             </div>
-            
-            <div class="brand-footer">
-                <span>ChoreStar v0.0.1-beta.3</span>
+            <button class="family-events-card" type="button" data-action="open-calendar">
+                <div id="sidebar-events-list" class="sidebar-events-list"></div>
+                <span class="schedule-edit"><i data-lucide="calendar-plus"></i> Edit schedule</span>
+            </button>
+            <div class="sidebar-note">
+                <span class="status-dot"></span>
+                <span id="sync-status">Synced to this household</span>
             </div>
+            <div class="brand-footer"><span id="app-version">Beta 4</span></div>
         </aside>
 
-        <!-- Main Content Area -->
-        <main class="main-content">
-            <div id="empty-state" class="empty-state hidden">
-                <div class="empty-icon-container">
-                    <i data-lucide="sparkles" class="empty-icon"></i>
+        <main class="main-content" id="today-panel">
+            <div class="main-heading">
+                <div>
+                    <span class="section-kicker">Today</span>
+                    <h1>Household lineup</h1>
                 </div>
-                <h2>Welcome to ChoreStar!</h2>
-                <p>Get started by adding family members and chores in the settings panel.</p>
+                <div id="member-switcher" class="member-switcher" aria-label="Choose family member"></div>
+            </div>
+            <div id="empty-state" class="empty-state hidden">
+                <img src="chorestar-mark.svg" alt="" class="empty-mark">
+                <h2>Set up your household</h2>
+                <p>Add family members, then build the first chore lineup.</p>
                 <button id="btn-setup-first" class="primary-btn">
-                    <i data-lucide="plus-circle"></i> Add First Member & Chores
+                    <i data-lucide="plus"></i> Add family members
                 </button>
             </div>
-
-            <!-- Grid for Kid Dashboard Cards -->
-            <div id="kids-grid" class="kids-grid">
-                <!-- Dynamically generated kid cards go here -->
-            </div>
+            <div id="kids-grid" class="kids-grid"></div>
         </main>
+
+        <nav class="mobile-nav" aria-label="Dashboard navigation">
+            <button type="button" data-action="scroll-panel" data-panel="today-panel"><i data-lucide="list-checks"></i><span>Today</span></button>
+            <button type="button" data-action="scroll-panel" data-panel="schedule-panel"><i data-lucide="calendar-days"></i><span>Schedule</span></button>
+            <button type="button" id="btn-settings-mobile"><i data-lucide="settings-2"></i><span>Manage</span></button>
+        </nav>
     </div>
 
     <!-- Settings Modal -->
     <div id="settings-modal" class="modal-overlay hidden">
         <div class="modal-card">
             <div class="modal-header">
-                <h2><i data-lucide="sliders"></i> Settings Panel</h2>
-                <button id="btn-close-modal" class="close-btn"><i data-lucide="x"></i></button>
+                <h2><img src="chorestar-mark.svg" alt="" class="modal-brand-mark"> Manage household</h2>
+                <button id="btn-close-modal" class="close-btn" type="button" aria-label="Close settings"><i data-lucide="x"></i></button>
             </div>
             
             <div class="modal-tabs">
-                <button id="tab-kids" class="tab-btn active" onclick="switchTab('kids')">Family Members</button>
-                <button id="tab-chores" class="tab-btn" onclick="switchTab('chores')">Chores</button>
-                <button id="tab-calendar" class="tab-btn" onclick="switchTab('calendar')">Calendar</button>
-                <button id="tab-rewards" class="tab-btn" onclick="switchTab('rewards')">Rewards & Security</button>
+                <button id="tab-kids" class="tab-btn active" type="button" data-action="switch-tab" data-tab="kids">Family Members</button>
+                <button id="tab-chores" class="tab-btn" type="button" data-action="switch-tab" data-tab="chores">Chores</button>
+                <button id="tab-calendar" class="tab-btn" type="button" data-action="switch-tab" data-tab="calendar">Calendar</button>
+                <button id="tab-rewards" class="tab-btn" type="button" data-action="switch-tab" data-tab="rewards">Rewards & Security</button>
             </div>
 
             <!-- Tab Content: Kids/Members -->
             <div id="tab-content-kids" class="tab-content">
                 <div class="section-header">
                     <h3>Manage Family Members</h3>
-                    <button onclick="showAddKidForm()" class="action-btn-sm"><i data-lucide="plus"></i> Add Member</button>
+                    <button type="button" data-action="show-add-kid" class="action-btn-sm"><i data-lucide="plus"></i> Add Member</button>
                 </div>
                 
                 <!-- Add Kid/Member Form (Hidden by default) -->
-                <form id="kid-form" class="settings-form hidden" onsubmit="saveKid(event)">
+                <form id="kid-form" class="settings-form hidden">
                     <input type="hidden" id="edit-kid-id">
                     <div class="form-row">
                         <div class="form-group">
@@ -181,7 +171,7 @@
                     </div>
                     <div class="form-actions">
                         <button type="submit" class="submit-btn">Save Member</button>
-                        <button type="button" class="cancel-btn" onclick="hideKidForm()">Cancel</button>
+                        <button type="button" class="cancel-btn" data-action="hide-kid-form">Cancel</button>
                     </div>
                 </form>
 
@@ -194,11 +184,11 @@
             <div id="tab-content-chores" class="tab-content hidden">
                 <div class="section-header">
                     <h3>Manage Chores</h3>
-                    <button onclick="showAddChoreForm()" class="action-btn-sm"><i data-lucide="plus"></i> Add Chore</button>
+                    <button type="button" data-action="show-add-chore" class="action-btn-sm"><i data-lucide="plus"></i> Add Chore</button>
                 </div>
 
                 <!-- Add Chore Form (Hidden by default) -->
-                <form id="chore-form" class="settings-form hidden" onsubmit="saveChore(event)">
+                <form id="chore-form" class="settings-form hidden">
                     <input type="hidden" id="edit-chore-id">
                     <div class="form-row">
                         <div class="form-group">
@@ -220,7 +210,7 @@
                         </div>
                         <div class="form-group">
                             <label for="chore-frequency">Frequency</label>
-                            <select id="chore-frequency" onchange="handleChoreFrequencyChange()">
+                            <select id="chore-frequency">
                                 <option value="daily">Daily</option>
                                 <option value="weekly">Weekly</option>
                                 <option value="days">Specific Days</option>
@@ -246,7 +236,7 @@
 
                     <div class="form-actions">
                         <button type="submit" class="submit-btn">Save Chore</button>
-                        <button type="button" class="cancel-btn" onclick="hideChoreForm()">Cancel</button>
+                        <button type="button" class="cancel-btn" data-action="hide-chore-form">Cancel</button>
                     </div>
                 </form>
 
@@ -261,7 +251,7 @@
                     <h3>Family Calendar & Agenda</h3>
                 </div>
                 
-                <form id="event-form" class="settings-form" onsubmit="saveEvent(event)">
+                <form id="event-form" class="settings-form">
                     <div class="form-row">
                         <div class="form-group">
                             <label for="event-title">Event Title</label>
@@ -307,8 +297,8 @@
                         <h4>Point Reset Schedule</h4>
                         <p class="description">Chores marked "Daily" reset automatically every morning. You can manually reset points here, or set reward goals.</p>
                         <div class="button-group-row">
-                            <button class="danger-btn" onclick="resetAllPointsConfirm()"><i data-lucide="rotate-ccw"></i> Reset All Points to 0</button>
-                            <button class="warning-btn" onclick="resetAllChoresConfirm()"><i data-lucide="refresh-cw"></i> Reset Today's Chores</button>
+                            <button type="button" class="danger-btn" data-action="reset-points"><i data-lucide="rotate-ccw"></i> Reset All Points to 0</button>
+                            <button type="button" class="warning-btn" data-action="reset-chores"><i data-lucide="refresh-cw"></i> Reset Today's Chores</button>
                         </div>
                     </div>
                     
@@ -316,7 +306,7 @@
                         <h4>Reward Goals</h4>
                         <p class="description">Add special achievements kids can claim once they earn enough points.</p>
                         
-                        <form id="reward-form" class="settings-form-inline" onsubmit="saveReward(event)">
+                        <form id="reward-form" class="settings-form-inline">
                             <input type="text" id="reward-title" placeholder="Reward description (e.g. 1 hour of screen time)" required>
                             <input type="number" id="reward-cost" placeholder="Points cost (e.g. 50)" required min="5">
                             <button type="submit" class="primary-btn-sm"><i data-lucide="plus"></i> Add Goal</button>
@@ -328,16 +318,16 @@
                     </div>
 
                     <div class="admin-option-group" style="margin-top: 2rem;">
-                        <h4>Parent Security PIN</h4>
-                        <p class="description">Prevent children from bypassing chores, adding points, or deleting profiles by locking the Settings Panel.</p>
+                        <h4>Parent PIN</h4>
+                        <p class="description">Require a parent PIN before changing household members, chores, rewards, or points.</p>
                         
                         <div class="settings-form-inline" style="margin-top: 1rem; border: none; padding: 0; display: flex; gap: 1rem; align-items: flex-end;">
                             <div class="form-group" style="flex: 1;">
                                 <label for="parent-pin-input">Set 4-Digit Security PIN (numbers only)</label>
                                 <input type="password" id="parent-pin-input" placeholder="e.g. 1234" maxlength="4" style="letter-spacing: 0.5rem; text-align: center; font-size: 1.25rem;">
                             </div>
-                            <button id="btn-save-pin" class="primary-btn" onclick="saveParentPin()" style="height: 46px; margin-top: auto;"><i data-lucide="shield-check"></i> Save PIN</button>
-                            <button id="btn-disable-pin" class="danger-btn hidden" onclick="disableParentPin()" style="height: 46px; margin-top: auto;"><i data-lucide="shield-off"></i> Disable PIN</button>
+                            <button id="btn-save-pin" type="button" class="primary-btn" data-action="save-pin" style="height: 46px; margin-top: auto;"><i data-lucide="shield-check"></i> Save PIN</button>
+                            <button id="btn-disable-pin" type="button" class="danger-btn hidden" data-action="disable-pin" style="height: 46px; margin-top: auto;"><i data-lucide="shield-off"></i> Disable PIN</button>
                         </div>
                     </div>
                 </div>
@@ -351,7 +341,7 @@
             <div class="pin-header">
                 <i data-lucide="lock" class="pin-lock-icon"></i>
                 <h3>Enter Parent PIN</h3>
-                <p>Security lock is active</p>
+                <p>Parent access is required</p>
             </div>
             
             <div class="pin-display">
@@ -362,22 +352,22 @@
             </div>
             
             <div class="pin-keypad">
-                <button class="pin-key" onclick="pressPinKey('1')">1</button>
-                <button class="pin-key" onclick="pressPinKey('2')">2</button>
-                <button class="pin-key" onclick="pressPinKey('3')">3</button>
-                <button class="pin-key" onclick="pressPinKey('4')">4</button>
-                <button class="pin-key" onclick="pressPinKey('5')">5</button>
-                <button class="pin-key" onclick="pressPinKey('6')">6</button>
-                <button class="pin-key" onclick="pressPinKey('7')">7</button>
-                <button class="pin-key" onclick="pressPinKey('8')">8</button>
-                <button class="pin-key" onclick="pressPinKey('9')">9</button>
-                <button class="pin-key clear" onclick="clearPin()">C</button>
-                <button class="pin-key" onclick="pressPinKey('0')">0</button>
-                <button class="pin-key backspace" onclick="backspacePin()"><i data-lucide="delete"></i></button>
+                <button type="button" class="pin-key" data-action="pin-key" data-key="1">1</button>
+                <button type="button" class="pin-key" data-action="pin-key" data-key="2">2</button>
+                <button type="button" class="pin-key" data-action="pin-key" data-key="3">3</button>
+                <button type="button" class="pin-key" data-action="pin-key" data-key="4">4</button>
+                <button type="button" class="pin-key" data-action="pin-key" data-key="5">5</button>
+                <button type="button" class="pin-key" data-action="pin-key" data-key="6">6</button>
+                <button type="button" class="pin-key" data-action="pin-key" data-key="7">7</button>
+                <button type="button" class="pin-key" data-action="pin-key" data-key="8">8</button>
+                <button type="button" class="pin-key" data-action="pin-key" data-key="9">9</button>
+                <button type="button" class="pin-key clear" data-action="clear-pin">C</button>
+                <button type="button" class="pin-key" data-action="pin-key" data-key="0">0</button>
+                <button type="button" class="pin-key backspace" data-action="backspace-pin" aria-label="Delete last digit"><i data-lucide="delete"></i></button>
             </div>
             
             <div style="margin-top: 1.5rem;">
-                <button class="cancel-btn" onclick="closePinModal()" style="width: 100%;">Cancel</button>
+                <button type="button" class="cancel-btn" data-action="close-pin" style="width: 100%;">Cancel</button>
             </div>
         </div>
     </div>
@@ -394,7 +384,8 @@
         </div>
     </div>
 
-    <!-- App Script -->
-    <script src="app.js?v=1.0.7"></script>
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+    <script src="app.js?v=0.0.1-beta.4"></script>
 </body>
 </html>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-labelledby="title">
+  <title id="title">ChoreStar</title>
+  <path fill="#f0bd3d" d="M19 2h10v13l-5 5-5-5z"/>
+  <path fill="#4f7cff" d="M46 19v10H33l-5-5 5-5z"/>
+  <path fill="#3fa675" d="M29 46H19V33l5-5 5 5z"/>
+  <path fill="#e84d63" d="M2 29V19h13l5 5-5 5z"/>
+</svg>
